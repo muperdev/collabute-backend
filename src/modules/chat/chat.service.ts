@@ -1,0 +1,359 @@
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
+import { PrismaService } from '../../database/prisma.service';
+import { CreateConversationDto, SendMessageDto } from './dto';
+
+@Injectable()
+export class ChatService {
+  constructor(private prisma: PrismaService) {}
+
+  async createConversation(
+    createConversationDto: CreateConversationDto,
+    userId: string,
+  ) {
+    if (
+      createConversationDto.type === 'PROJECT' &&
+      !createConversationDto.projectId
+    ) {
+      throw new BadRequestException(
+        'Project ID is required for project conversations',
+      );
+    }
+
+    if (createConversationDto.projectId) {
+      const project = await this.prisma.project.findUnique({
+        where: { id: createConversationDto.projectId },
+        include: { collaborators: true },
+      });
+
+      if (!project) {
+        throw new NotFoundException('Project not found');
+      }
+
+      const isCollaborator =
+        project.ownerId === userId ||
+        project.collaborators.some((collab) => collab.userId === userId);
+
+      if (!isCollaborator) {
+        throw new ForbiddenException(
+          'You are not authorized to create conversations in this project',
+        );
+      }
+    }
+
+    const conversation = await this.prisma.conversation.create({
+      data: {
+        title: createConversationDto.title,
+        type: createConversationDto.type,
+        projectId: createConversationDto.projectId,
+        createdById: userId,
+        participants: {
+          create: [
+            {
+              userId,
+              role: 'ADMIN',
+            },
+            ...(createConversationDto.participantIds || []).map(
+              (participantId) => ({
+                userId: participantId,
+                role: 'MEMBER' as const,
+              }),
+            ),
+          ],
+        },
+      },
+      include: {
+        participants: {
+          include: { user: true },
+        },
+        project: true,
+        createdBy: true,
+      },
+    });
+
+    return conversation;
+  }
+
+  async findConversations(userId: string, query: any) {
+    const { page = 1, limit = 20, type, projectId } = query;
+
+    return this.prisma.conversation.findMany({
+      where: {
+        participants: {
+          some: { userId },
+        },
+        ...(type && { type }),
+        ...(projectId && { projectId }),
+      },
+      include: {
+        participants: {
+          include: { user: true },
+        },
+        project: true,
+        createdBy: true,
+        _count: {
+          select: {
+            messages: true,
+          },
+        },
+        messages: {
+          take: 1,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            sender: true,
+          },
+        },
+      },
+      skip: (page - 1) * limit,
+      take: limit,
+      orderBy: { updatedAt: 'desc' },
+    });
+  }
+
+  async findConversation(conversationId: string, userId: string) {
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { id: conversationId },
+      include: {
+        participants: {
+          include: { user: true },
+        },
+        project: true,
+        createdBy: true,
+      },
+    });
+
+    if (!conversation) {
+      throw new NotFoundException('Conversation not found');
+    }
+
+    const isParticipant = conversation.participants.some(
+      (p) => p.userId === userId,
+    );
+    if (!isParticipant) {
+      throw new ForbiddenException(
+        'You are not a participant in this conversation',
+      );
+    }
+
+    return conversation;
+  }
+
+  async sendMessage(sendMessageDto: SendMessageDto, userId: string) {
+    const conversation = await this.findConversation(
+      sendMessageDto.conversationId,
+      userId,
+    );
+
+    if (sendMessageDto.replyToId) {
+      const replyTo = await this.prisma.message.findUnique({
+        where: { id: sendMessageDto.replyToId },
+      });
+
+      if (
+        !replyTo ||
+        replyTo.conversationId !== sendMessageDto.conversationId
+      ) {
+        throw new BadRequestException('Invalid reply-to message');
+      }
+    }
+
+    const message = await this.prisma.message.create({
+      data: {
+        content: sendMessageDto.content,
+        conversationId: sendMessageDto.conversationId,
+        senderId: userId,
+        replyToId: sendMessageDto.replyToId,
+      },
+      include: {
+        sender: true,
+        replyTo: {
+          include: {
+            sender: true,
+          },
+        },
+      },
+    });
+
+    await this.prisma.conversation.update({
+      where: { id: sendMessageDto.conversationId },
+      data: { updatedAt: new Date() },
+    });
+
+    return message;
+  }
+
+  async getMessages(conversationId: string, userId: string, query: any) {
+    await this.findConversation(conversationId, userId);
+
+    const { page = 1, limit = 50 } = query;
+
+    return this.prisma.message.findMany({
+      where: { conversationId },
+      include: {
+        sender: true,
+        replyTo: {
+          include: {
+            sender: true,
+          },
+        },
+      },
+      skip: (page - 1) * limit,
+      take: limit,
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  async deleteMessage(messageId: string, userId: string) {
+    const message = await this.prisma.message.findUnique({
+      where: { id: messageId },
+      include: {
+        conversation: {
+          include: {
+            participants: true,
+          },
+        },
+      },
+    });
+
+    if (!message) {
+      throw new NotFoundException('Message not found');
+    }
+
+    const isAuthorized =
+      message.senderId === userId ||
+      message.conversation.participants.some(
+        (p) => p.userId === userId && p.role === 'ADMIN',
+      );
+
+    if (!isAuthorized) {
+      throw new ForbiddenException(
+        'You are not authorized to delete this message',
+      );
+    }
+
+    return this.prisma.message.delete({
+      where: { id: messageId },
+    });
+  }
+
+  async addParticipant(
+    conversationId: string,
+    participantId: string,
+    userId: string,
+  ) {
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { id: conversationId },
+      include: {
+        participants: true,
+      },
+    });
+
+    if (!conversation) {
+      throw new NotFoundException('Conversation not found');
+    }
+
+    const userParticipant = conversation.participants.find(
+      (p) => p.userId === userId,
+    );
+    if (!userParticipant || userParticipant.role !== 'ADMIN') {
+      throw new ForbiddenException('Only admins can add participants');
+    }
+
+    const existingParticipant = conversation.participants.find(
+      (p) => p.userId === participantId,
+    );
+    if (existingParticipant) {
+      throw new BadRequestException('User is already a participant');
+    }
+
+    const participant = await this.prisma.conversationParticipant.create({
+      data: {
+        conversationId,
+        userId: participantId,
+        role: 'MEMBER',
+      },
+      include: {
+        user: true,
+      },
+    });
+
+    return participant;
+  }
+
+  async removeParticipant(
+    conversationId: string,
+    participantId: string,
+    userId: string,
+  ) {
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { id: conversationId },
+      include: {
+        participants: true,
+      },
+    });
+
+    if (!conversation) {
+      throw new NotFoundException('Conversation not found');
+    }
+
+    const userParticipant = conversation.participants.find(
+      (p) => p.userId === userId,
+    );
+    const targetParticipant = conversation.participants.find(
+      (p) => p.userId === participantId,
+    );
+
+    if (!targetParticipant) {
+      throw new NotFoundException('Participant not found');
+    }
+
+    const canRemove =
+      userParticipant?.role === 'ADMIN' || userId === participantId;
+    if (!canRemove) {
+      throw new ForbiddenException(
+        'You are not authorized to remove this participant',
+      );
+    }
+
+    await this.prisma.conversationParticipant.delete({
+      where: {
+        conversationId_userId: {
+          conversationId,
+          userId: participantId,
+        },
+      },
+    });
+
+    return { message: 'Participant removed successfully' };
+  }
+
+  async markAsRead(conversationId: string, userId: string) {
+    await this.findConversation(conversationId, userId);
+
+    // Get the latest message in the conversation
+    const latestMessage = await this.prisma.message.findFirst({
+      where: { conversationId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (latestMessage) {
+      await this.prisma.conversationParticipant.update({
+        where: {
+          conversationId_userId: {
+            conversationId,
+            userId,
+          },
+        },
+        data: {
+          lastReadMessageId: latestMessage.id,
+        },
+      });
+    }
+
+    return { message: 'Conversation marked as read' };
+  }
+}

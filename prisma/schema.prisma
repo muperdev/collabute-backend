@@ -1,0 +1,548 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  name           String
+  profilePicture String?
+  type           UserType  @default(DEVELOPER)
+  phoneNumber    String?   @unique
+  countryCode    String?
+  country        String?
+  industry       String?
+  role           Role?     @relation(fields: [roleId], references: [id])
+  roleId         String?
+  isVerified     Boolean   @default(false)
+  kycStatus      KycStatus @default(PENDING)
+  earlybird      Boolean   @default(false)
+  wallet         Float     @default(0)
+
+  // GitHub Integration
+  githubId             String?      @unique
+  githubUsername       String?
+  githubConnected      Boolean      @default(false)
+  githubConnectedAt    DateTime?
+  githubAccessToken    String?
+  githubInstallationId String?
+  githubLastFetch      DateTime?
+  githubRepositories   GitHubRepo[]
+
+  // Developer Fields
+  bio                 String?
+  skills              Skill[]
+  experience          Int?
+  experienceLevel     ExperienceLevel?
+  availability        Availability?
+  preferredWorkType   WorkType?
+  hourlyRate          Float?
+  stripeAccountId     String?
+  stripeAccountStatus StripeStatus     @default(PENDING)
+
+  // Lead Fields
+  specializations  Stack[]
+  title            String?
+  location         String?
+  calendar         Calendar[]
+  preferredPayment PaymentMethod?
+
+  // Relationships
+  ownedProjects         Project[]                 @relation("ProjectOwner")
+  teamLeadProjects      Project[]                 @relation("TeamLead")
+  participatingProjects ProjectCollaborator[]
+  assignedIssues        Issue[]
+  reportedIssues        Issue[]                   @relation("IssueReporter")
+  conversations         ConversationParticipant[]
+  createdConversations  Conversation[]
+  messages              Message[]
+  transactions          Transaction[]
+  payments              Payment[]
+  collaborationRequests CollaborationRequest[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+model Role {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  displayName String
+  description String?
+  isActive    Boolean @default(true)
+  permissions Json
+  users       User[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("roles")
+}
+
+model Project {
+  id              String        @id @default(cuid())
+  title           String
+  slug            String        @unique
+  description     String
+  longDescription String?
+  logoUrl         String?
+  type            ProjectType   @default(NORMAL)
+  status          ProjectStatus @default(PLANNED)
+  state           ProjectState  @default(DRAFT)
+  startDate       DateTime
+  endDate         DateTime?
+  budget          Float?
+
+  // Owner and Team
+  owner         User                  @relation("ProjectOwner", fields: [ownerId], references: [id])
+  ownerId       String
+  teamLead      User?                 @relation("TeamLead", fields: [teamLeadId], references: [id])
+  teamLeadId    String?
+  collaborators ProjectCollaborator[]
+
+  // Technical
+  stacks     ProjectStack[]
+  issues     Issue[]
+  repository GitHubRepository?
+
+  // Milestones
+  milestones Json
+  tags       String[]
+
+  // Product Association
+  product   Product? @relation(fields: [productId], references: [id])
+  productId String?
+
+  // Conversations
+  conversations Conversation[]
+  transactions  Transaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("projects")
+}
+
+model Issue {
+  id              String          @id @default(cuid())
+  title           String
+  slug            String          @unique
+  description     String?
+  longDescription String?
+  type            IssueType       @default(FEATURE)
+  category        IssueCategory[]
+  status          IssueStatus     @default(OPEN)
+  priority        Priority        @default(MEDIUM)
+  budget          Float?
+
+  // Media
+  onboardingVideoLink    String?
+  onboardingVideoUrl     String?
+  onboardingThumbnailUrl String?
+
+  // Relationships
+  project    Project @relation(fields: [projectId], references: [id])
+  projectId  String
+  assignees  User[]
+  reporter   User    @relation("IssueReporter", fields: [reporterId], references: [id])
+  reporterId String
+
+  // Collaboration
+  collaborationRequests CollaborationRequest[]
+  requests              IssueRequest[]
+  labels                String[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("issues")
+}
+
+model CollaborationRequest {
+  id              String              @id @default(cuid())
+  developer       User                @relation(fields: [developerId], references: [id])
+  developerId     String
+  issue           Issue               @relation(fields: [issueId], references: [id])
+  issueId         String
+  percentageShare Float
+  taskDefinition  String?
+  status          CollaborationStatus @default(PENDING)
+  requestedAt     DateTime            @default(now())
+
+  @@map("collaboration_requests")
+}
+
+model GitHubRepository {
+  id            String  @id @default(cuid())
+  repoId        String  @unique
+  name          String
+  fullName      String
+  url           String
+  isPrivate     Boolean @default(false)
+  description   String?
+  language      String?
+  defaultBranch String?
+
+  // Project association
+  project   Project? @relation(fields: [projectId], references: [id])
+  projectId String?  @unique
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  pushedAt  DateTime?
+
+  @@map("github_repositories")
+}
+
+model Conversation {
+  id           String           @id @default(cuid())
+  title        String
+  name         String?
+  type         ConversationType @default(PRIVATE)
+  description  String?
+  avatarUrl    String?
+  isArchived   Boolean          @default(false)
+  archivedAt   DateTime?
+  messageCount Int              @default(0)
+
+  // Relationships
+  participants  ConversationParticipant[]
+  messages      Message[]
+  project       Project?                  @relation(fields: [projectId], references: [id])
+  projectId     String?
+  createdBy     User?                     @relation(fields: [createdById], references: [id])
+  createdById   String?
+  lastMessage   Message?                  @relation("LastMessage", fields: [lastMessageId], references: [id])
+  lastMessageId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("conversations")
+}
+
+model Message {
+  id      String      @id @default(cuid())
+  content String
+  type    MessageType @default(TEXT)
+
+  // Relationships
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  conversationId String
+  sender         User         @relation(fields: [senderId], references: [id])
+  senderId       String
+  replyTo        Message?     @relation("MessageReply", fields: [replyToId], references: [id])
+  replyToId      String?
+  replies        Message[]    @relation("MessageReply")
+
+  // Media
+  attachments String[]
+
+  // Status
+  isEdited  Boolean   @default(false)
+  editedAt  DateTime?
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
+  // Read tracking
+  lastMessage      Conversation[]            @relation("LastMessage")
+  participantReads ConversationParticipant[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("messages")
+}
+
+// Junction Tables and Supporting Models
+
+model ProjectCollaborator {
+  id        String             @id @default(cuid())
+  project   Project            @relation(fields: [projectId], references: [id])
+  projectId String
+  user      User               @relation(fields: [userId], references: [id])
+  userId    String
+  status    CollaboratorStatus @default(ACTIVE)
+  joinedAt  DateTime           @default(now())
+
+  @@unique([projectId, userId])
+  @@map("project_collaborators")
+}
+
+model ConversationParticipant {
+  id                String            @id @default(cuid())
+  conversation      Conversation      @relation(fields: [conversationId], references: [id])
+  conversationId    String
+  user              User              @relation(fields: [userId], references: [id])
+  userId            String
+  role              ParticipantRole   @default(MEMBER)
+  joinedAt          DateTime          @default(now())
+  leftAt            DateTime?
+  lastReadMessage   Message?          @relation(fields: [lastReadMessageId], references: [id])
+  lastReadMessageId String?
+  notifications     NotificationLevel @default(ALL)
+
+  @@unique([conversationId, userId])
+  @@map("conversation_participants")
+}
+
+model Transaction {
+  id          String            @id @default(cuid())
+  user        User              @relation(fields: [userId], references: [id])
+  userId      String
+  amount      Float
+  type        TransactionType
+  method      PaymentMethod
+  status      TransactionStatus @default(PENDING)
+  reference   String?
+  description String?
+  project     Project?          @relation(fields: [projectId], references: [id])
+  projectId   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("transactions")
+}
+
+// Supporting models
+
+model Product {
+  id       String    @id @default(cuid())
+  name     String
+  projects Project[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("products")
+}
+
+model GitHubRepo {
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id])
+  userId String
+  repoId String
+  name   String
+
+  @@map("github_repos")
+}
+
+model Skill {
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id])
+  userId String
+  name   String
+
+  @@map("skills")
+}
+
+model Stack {
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id])
+  userId String
+  name   String
+
+  @@map("stacks")
+}
+
+model Calendar {
+  id     String   @id @default(cuid())
+  user   User     @relation(fields: [userId], references: [id])
+  userId String
+  date   DateTime
+
+  @@map("calendars")
+}
+
+model ProjectStack {
+  id        String  @id @default(cuid())
+  project   Project @relation(fields: [projectId], references: [id])
+  projectId String
+  name      String
+
+  @@map("project_stacks")
+}
+
+model IssueRequest {
+  id      String @id @default(cuid())
+  issue   Issue  @relation(fields: [issueId], references: [id])
+  issueId String
+  content String
+
+  @@map("issue_requests")
+}
+
+model Payment {
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id])
+  userId String
+  amount Float
+
+  @@map("payments")
+}
+
+// Enums
+enum UserType {
+  DEVELOPER
+  STARTUP
+  DESIGNER
+  LEAD
+  PROJECT_MANAGER
+}
+
+enum KycStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum ExperienceLevel {
+  JUNIOR
+  MID_LEVEL
+  SENIOR
+  LEAD
+  ARCHITECT
+}
+
+enum Availability {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  FREELANCE
+  NOT_AVAILABLE
+}
+
+enum WorkType {
+  REMOTE
+  ON_SITE
+  HYBRID
+}
+
+enum StripeStatus {
+  PENDING
+  ACTIVE
+  RESTRICTED
+  DISABLED
+}
+
+enum PaymentMethod {
+  HOURLY
+  DCM
+  CREDIT_CARD
+  BANK_TRANSFER
+  CRYPTO
+}
+
+enum ProjectType {
+  NORMAL
+  URGENT
+  FEATURED
+  TRENDING
+}
+
+enum ProjectStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  ON_HOLD
+}
+
+enum ProjectState {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  IN_PROGRESS
+  COMPLETED
+  REJECTED
+}
+
+enum IssueType {
+  FEATURE
+  BUG
+}
+
+enum IssueCategory {
+  BACKEND
+  FRONTEND
+  APPLICATION
+  AI
+  DATA
+  MACHINE_LEARNING
+  DEVOPS
+  SECURITY
+  DATABASE
+  QUALITY_ASSURANCE
+  DOCUMENTATION
+  SEO
+}
+
+enum IssueStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum CollaborationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+enum ConversationType {
+  PRIVATE
+  GROUP
+  PROJECT
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+  SYSTEM
+}
+
+enum CollaboratorStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ParticipantRole {
+  ADMIN
+  MODERATOR
+  MEMBER
+}
+
+enum NotificationLevel {
+  ALL
+  MENTIONS
+  MUTED
+}
+
+enum TransactionType {
+  INCOME
+  WITHDRAWAL
+  TIP
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
