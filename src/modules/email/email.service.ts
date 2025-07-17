@@ -13,20 +13,36 @@ export interface EmailTemplate {
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
-  private readonly resend: Resend;
+  private readonly resend: Resend | null;
 
   constructor(private configService: ConfigService) {
     const apiKey = this.configService.get<string>('RESEND_API_KEY');
     if (!apiKey) {
-      this.logger.warn('RESEND_API_KEY not configured. Email sending will be disabled.');
+      this.logger.warn(
+        'RESEND_API_KEY not configured. Email sending will be disabled.',
+      );
+      this.resend = null;
+    } else {
+      this.resend = new Resend(apiKey);
     }
-    this.resend = new Resend(apiKey);
   }
 
-  async sendEmail({ to, subject, template, data }: EmailTemplate): Promise<{ success: boolean; id?: string }> {
+  async sendEmail({
+    to,
+    subject,
+    template,
+    data,
+  }: EmailTemplate): Promise<{ success: boolean; id?: string }> {
+    if (!this.resend) {
+      this.logger.warn(
+        `Email sending disabled. Would have sent email to ${to} with subject: ${subject}`,
+      );
+      return { success: false };
+    }
+
     try {
       const htmlContent = this.renderTemplate(template, data);
-      
+
       const response = await this.resend.emails.send({
         from: 'Collabute <noreply@collabute.com>',
         to,
@@ -34,7 +50,9 @@ export class EmailService {
         html: htmlContent,
       });
 
-      this.logger.log(`Email sent successfully to ${to}, ID: ${response.data?.id}`);
+      this.logger.log(
+        `Email sent successfully to ${to}, ID: ${response.data?.id}`,
+      );
       return { success: true, id: response.data?.id };
     } catch (error) {
       this.logger.error(`Failed to send email to ${to}:`, error);
@@ -45,7 +63,8 @@ export class EmailService {
   private renderTemplate(template: string, data: EmailTemplateData): string {
     const templates: Record<string, (data: EmailTemplateData) => string> = {
       welcome: (data) => {
-        const welcomeData = data as import('../jobs/jobs.service').WelcomeEmailData;
+        const welcomeData =
+          data as import('../jobs/jobs.service').WelcomeEmailData;
         return `
           <h1>Welcome to Collabute!</h1>
           <p>Hi ${welcomeData.userName},</p>
@@ -55,7 +74,8 @@ export class EmailService {
         `;
       },
       'project-invitation': (data) => {
-        const inviteData = data as import('../jobs/jobs.service').ProjectInvitationEmailData;
+        const inviteData =
+          data as import('../jobs/jobs.service').ProjectInvitationEmailData;
         return `
           <h1>You've been invited to join a project</h1>
           <p>Hi there,</p>
@@ -66,7 +86,8 @@ export class EmailService {
         `;
       },
       'issue-assigned': (data) => {
-        const issueData = data as import('../jobs/jobs.service').IssueAssignedEmailData;
+        const issueData =
+          data as import('../jobs/jobs.service').IssueAssignedEmailData;
         return `
           <h1>You've been assigned to an issue</h1>
           <p>Hi ${issueData.assigneeName},</p>

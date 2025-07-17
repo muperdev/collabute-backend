@@ -8,15 +8,23 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Logger, UseGuards } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { ChatService } from './chat.service';
 import { SendMessageDto } from './dto';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../database/prisma.service';
+import { User } from '@prisma/client';
+
+interface JwtPayload {
+  sub: string;
+  email: string;
+  iat: number;
+  exp: number;
+}
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
-  user?: any;
+  user?: User;
 }
 
 @WebSocketGateway({
@@ -42,15 +50,18 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   async handleConnection(client: AuthenticatedSocket) {
     try {
       const token =
-        client.handshake.auth.token ||
-        client.handshake.headers.authorization?.replace('Bearer ', '');
+        (client.handshake.auth.token as string) ||
+        (client.handshake.headers.authorization as string)?.replace(
+          'Bearer ',
+          '',
+        );
 
       if (!token) {
         client.disconnect();
         return;
       }
 
-      const payload = this.jwtService.verify(token);
+      const payload = this.jwtService.verify<JwtPayload>(token);
       const user = await this.prisma.user.findUnique({
         where: { id: payload.sub },
       });
@@ -86,9 +97,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       });
       this.logger.log(`User ${user.email} connected with socket ${client.id}`);
 
-      client.broadcast.emit('user-online', { userId: user.id });
+      void client.broadcast.emit('user-online', { userId: user.id });
     } catch (error) {
-      this.logger.error('Authentication failed:', error);
+      this.logger.error(
+        'Authentication failed:',
+        error instanceof Error ? error.message : String(error),
+      );
       client.disconnect();
     }
   }
@@ -136,7 +150,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       client.emit('message-sent', { messageId: message.id });
     } catch (error) {
-      client.emit('error', { message: error.message });
+      client.emit('error', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+      });
     }
   }
 
@@ -161,19 +177,21 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         conversationId: data.conversationId,
       });
 
-      this.server
+      void this.server
         .to(`conversation:${data.conversationId}`)
         .emit('user-joined', {
           userId: client.userId,
           conversationId: data.conversationId,
         });
     } catch (error) {
-      client.emit('error', { message: error.message });
+      client.emit('error', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+      });
     }
   }
 
   @SubscribeMessage('leave-conversation')
-  async handleLeaveConversation(
+  handleLeaveConversation(
     @MessageBody() data: { conversationId: string },
     @ConnectedSocket() client: AuthenticatedSocket,
   ) {
@@ -186,14 +204,16 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     client.emit('left-conversation', { conversationId: data.conversationId });
 
-    this.server.to(`conversation:${data.conversationId}`).emit('user-left', {
-      userId: client.userId,
-      conversationId: data.conversationId,
-    });
+    void this.server
+      .to(`conversation:${data.conversationId}`)
+      .emit('user-left', {
+        userId: client.userId,
+        conversationId: data.conversationId,
+      });
   }
 
   @SubscribeMessage('typing-start')
-  async handleTypingStart(
+  handleTypingStart(
     @MessageBody() data: { conversationId: string },
     @ConnectedSocket() client: AuthenticatedSocket,
   ) {
@@ -207,7 +227,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('typing-stop')
-  async handleTypingStop(
+  handleTypingStop(
     @MessageBody() data: { conversationId: string },
     @ConnectedSocket() client: AuthenticatedSocket,
   ) {
@@ -241,19 +261,21 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
           readAt: new Date(),
         });
     } catch (error) {
-      client.emit('error', { message: error.message });
+      client.emit('error', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+      });
     }
   }
 
-  async notifyConversationUpdate(
+  notifyConversationUpdate(
     conversationId: string,
     event: string,
-    data: any,
+    data: Record<string, unknown>,
   ) {
     this.server.to(`conversation:${conversationId}`).emit(event, data);
   }
 
-  async notifyUserStatus(userId: string, status: 'online' | 'offline') {
+  notifyUserStatus(userId: string, status: 'online' | 'offline') {
     this.server.emit(`user-${status}`, { userId });
   }
 

@@ -5,7 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
-import { CreateConversationDto, SendMessageDto } from './dto';
+import { CreateConversationDto, SendMessageDto, ConversationType } from './dto';
 
 @Injectable()
 export class ChatService {
@@ -16,7 +16,7 @@ export class ChatService {
     userId: string,
   ) {
     if (
-      createConversationDto.type === 'PROJECT' &&
+      createConversationDto.type === ConversationType.PROJECT &&
       !createConversationDto.projectId
     ) {
       throw new BadRequestException(
@@ -78,7 +78,15 @@ export class ChatService {
     return conversation;
   }
 
-  async findConversations(userId: string, query: any) {
+  async findConversations(
+    userId: string,
+    query: {
+      page: number;
+      limit: number;
+      type: ConversationType;
+      projectId: string;
+    },
+  ) {
     const { page = 1, limit = 20, type, projectId } = query;
 
     return this.prisma.conversation.findMany({
@@ -143,11 +151,6 @@ export class ChatService {
   }
 
   async sendMessage(sendMessageDto: SendMessageDto, userId: string) {
-    const conversation = await this.findConversation(
-      sendMessageDto.conversationId,
-      userId,
-    );
-
     if (sendMessageDto.replyToId) {
       const replyTo = await this.prisma.message.findUnique({
         where: { id: sendMessageDto.replyToId },
@@ -186,7 +189,11 @@ export class ChatService {
     return message;
   }
 
-  async getMessages(conversationId: string, userId: string, query: any) {
+  async getMessages(
+    conversationId: string,
+    userId: string,
+    query: { page: number; limit: number },
+  ) {
     await this.findConversation(conversationId, userId);
 
     const { page = 1, limit = 50 } = query;
