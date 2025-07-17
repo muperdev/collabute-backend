@@ -20,6 +20,7 @@ export class AuthService {
       data: {
         email: registerDto.email,
         name: registerDto.name,
+        password: hashedPassword,
         profilePicture: registerDto.profilePicture,
       },
       include: {
@@ -47,6 +48,17 @@ export class AuthService {
 
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
+    }
+
+    // Validate password
+    if (user.password && loginDto.password) {
+      const isPasswordValid = await bcrypt.compare(
+        loginDto.password,
+        user.password,
+      );
+      if (!isPasswordValid) {
+        throw new UnauthorizedException('Invalid credentials');
+      }
     }
 
     const payload = { email: user.email, sub: user.id };

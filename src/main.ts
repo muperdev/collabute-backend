@@ -69,6 +69,7 @@ A comprehensive GitHub collaboration platform API built with NestJS.
     .addTag('chat', 'Real-time messaging')
     .addTag('github', 'GitHub integration')
     .addTag('jobs', 'Background job management')
+    .addTag('frontend', 'Frontend authentication and utilities')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
@@ -84,10 +85,25 @@ A comprehensive GitHub collaboration platform API built with NestJS.
     ],
   });
 
-  // CORS
+  // CORS - Enhanced for frontend-backend communication
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: [
+      process.env.FRONTEND_URL || 'http://localhost:3000',
+      'https://collabute.com',
+    ],
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Requested-With',
+      'Accept',
+      'Origin',
+      'X-API-Key',
+    ],
+    exposedHeaders: ['X-Total-Count'],
+    optionsSuccessStatus: 200, // For legacy browser support
+    preflightContinue: false,
   });
 
   await app.listen(process.env.PORT ?? 3000);

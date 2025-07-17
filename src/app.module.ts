@@ -13,6 +13,7 @@ import { ChatModule } from './modules/chat/chat.module';
 import { JobsModule } from './modules/jobs/jobs.module';
 import { RedisModule } from './modules/redis/redis.module';
 import { UploadModule } from './modules/upload/upload.module';
+import { FrontendModule } from './modules/frontend/frontend.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { UploadModule } from './modules/upload/upload.module';
     JobsModule,
     RedisModule,
     UploadModule,
+    FrontendModule,
   ],
   controllers: [AppController],
   providers: [AppService],
