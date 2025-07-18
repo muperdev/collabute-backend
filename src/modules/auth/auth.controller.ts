@@ -3,37 +3,43 @@ import {
   Post,
   Body,
   Get,
-  UseGuards,
   Req,
   Res,
   Headers,
   Request as RequestDecorator,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { LoginDto, RegisterDto } from './dto/auth.dto';
-import { BetterAuthGuard } from '../../common/guards/better-auth.guard';
 import { Request, Response } from 'express';
+import {
+  registerDecorator,
+  loginDecorator,
+  githubAuthDecorator,
+  githubCallbackDecorator,
+  getProfileDecorator,
+  logoutDecorator,
+} from './decorators/response.decorator';
 
-@ApiTags('Authentication')
+@ApiTags('auth')
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  @ApiOperation({ summary: 'Register a new user' })
   @Post('register')
+  @registerDecorator()
   async register(@Body() registerDto: RegisterDto) {
     return this.authService.register(registerDto);
   }
 
-  @ApiOperation({ summary: 'Login user' })
   @Post('login')
+  @loginDecorator()
   async login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto);
   }
 
-  @ApiOperation({ summary: 'GitHub OAuth login' })
   @Get('github')
+  @githubAuthDecorator()
   async githubAuth(@Res() res: Response) {
     // Better Auth automatically handles OAuth at /api/auth/github
     // This endpoint redirects to Better Auth's built-in GitHub OAuth handler
@@ -41,8 +47,8 @@ export class AuthController {
     res.redirect(githubAuthUrl);
   }
 
-  @ApiOperation({ summary: 'GitHub OAuth callback' })
   @Get('github/callback')
+  @githubCallbackDecorator()
   async githubAuthCallback(@Req() req: Request, @Res() res: Response) {
     // Better Auth automatically handles the callback at /api/auth/github/callback
     // This endpoint is for documentation purposes - actual callback is handled by Better Auth
@@ -50,18 +56,14 @@ export class AuthController {
     res.redirect(`${frontendUrl}/auth/callback`);
   }
 
-  @ApiOperation({ summary: 'Get current user profile' })
-  @ApiBearerAuth()
   @Get('profile')
-  @UseGuards(BetterAuthGuard)
+  @getProfileDecorator()
   async getProfile(@RequestDecorator() req: any) {
     return { user: req.user };
   }
 
-  @ApiOperation({ summary: 'Logout user' })
-  @ApiBearerAuth()
   @Post('logout')
-  @UseGuards(BetterAuthGuard)
+  @logoutDecorator()
   async logout(@Headers('authorization') authorization: string) {
     const token = authorization?.replace('Bearer ', '');
     return this.authService.logout(token);

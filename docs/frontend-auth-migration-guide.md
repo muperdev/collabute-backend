@@ -2,577 +2,707 @@
 
 ## Overview
 
-This guide provides a complete reference for migrating your frontend to the new authentication system. The backend supports multiple authentication methods: API Key authentication for frontend identification and JWT authentication for user sessions.
+This guide provides a complete reference for migrating your frontend to the **Better Auth** authentication system. The backend now uses Better Auth, which provides a comprehensive authentication solution with built-in security features, automatic session management, and seamless OAuth integration.
 
 ## Table of Contents
 
-1. [Authentication Types](#authentication-types)
-2. [Environment Setup](#environment-setup)
-3. [Registration Flow](#registration-flow)
-4. [Login Flow](#login-flow)
-5. [GitHub OAuth Flow](#github-oauth-flow)
-6. [API Call Patterns](#api-call-patterns)
-7. [Header Requirements](#header-requirements)
-8. [Route Guards](#route-guards)
-9. [Error Handling](#error-handling)
-10. [Example Implementation](#example-implementation)
+1. [Better Auth Overview](#better-auth-overview)
+2. [Migration Steps](#migration-steps)
+3. [Environment Setup](#environment-setup)
+4. [Client Setup](#client-setup)
+5. [Authentication Flow](#authentication-flow)
+6. [Session Management](#session-management)
+7. [API Integration](#api-integration)
+8. [Error Handling](#error-handling)
+9. [Example Implementation](#example-implementation)
+10. [Migration Checklist](#migration-checklist)
 
 ---
 
-## Authentication Types
+## Better Auth Overview
 
-### 1. API Key Authentication
-- **Purpose**: Identifies trusted frontend applications
-- **Header**: `X-API-Key`
-- **Usage**: For frontend-specific endpoints
-- **Environment Variable**: `FRONTEND_API_KEY`
+### Key Changes from Legacy System
 
-### 2. JWT Authentication
-- **Purpose**: User session management
-- **Header**: `Authorization: Bearer <token>`
-- **Usage**: For user-protected endpoints
-- **Validation**: Includes database user verification
+1. **Session Management**: Automatic cookie-based sessions (no manual JWT handling)
+2. **Authentication**: Built-in email/password and OAuth providers
+3. **Security**: Built-in CSRF protection and session validation
+4. **Integration**: Single auth client for all authentication needs
+
+### Benefits
+- **Simplified Integration**: No manual token management
+- **Enhanced Security**: Built-in security features
+- **Automatic OAuth**: GitHub OAuth handled automatically
+- **Session Persistence**: Automatic session management across requests
+
+---
+
+## Migration Steps
+
+### Step 1: Remove Legacy Code
+
+```javascript
+// Remove these legacy patterns:
+// ❌ Manual JWT token storage
+localStorage.removeItem('accessToken');
+localStorage.removeItem('user');
+
+// ❌ Manual Authorization headers
+// headers: { 'Authorization': `Bearer ${token}` }
+
+// ❌ Manual API key headers
+// headers: { 'X-API-Key': process.env.NEXT_PUBLIC_API_KEY }
+```
+
+### Step 2: Install Better Auth Client
+
+```bash
+npm install better-auth
+# or
+yarn add better-auth
+# or
+bun add better-auth
+```
+
+### Step 3: Update Environment Variables
+
+```env
+# Replace legacy variables with Better Auth configuration
+# Remove these:
+# NEXT_PUBLIC_API_KEY=...
+# NEXT_PUBLIC_JWT_SECRET=...
+
+# Add these:
+NEXT_PUBLIC_API_URL=https://your-api-domain.com
+NEXT_PUBLIC_GITHUB_CLIENT_ID=your-github-client-id
+```
 
 ---
 
 ## Environment Setup
 
-### Backend Environment Variables
+### Backend Environment Variables (Already Configured)
 ```env
-# Frontend API Key for secure communication
-FRONTEND_API_KEY=your-base64-encoded-api-key-here
-
-# JWT Configuration
+# Better Auth Configuration
 JWT_SECRET=your-super-secret-jwt-key-at-least-32-characters-long
-JWT_EXPIRES_IN=7d
-
-# Database Connection
-DATABASE_URI=your-production-database-url
+GITHUB_CLIENT_ID=your-github-client-id
+GITHUB_CLIENT_SECRET=your-github-client-secret
+BACKEND_URL=https://your-api-domain.com
+FRONTEND_URL=https://your-frontend-domain.com
+DATABASE_URL=your-production-database-url
 ```
 
 ### Frontend Environment Variables
 ```env
-# API Configuration
+# Better Auth Configuration
 NEXT_PUBLIC_API_URL=https://your-api-domain.com
-NEXT_PUBLIC_API_KEY=your-base64-encoded-api-key-here
+NEXT_PUBLIC_GITHUB_CLIENT_ID=your-github-client-id
 ```
 
 ---
 
-## Registration Flow
+## Client Setup
 
-### Endpoint: `POST /auth/register`
+### Create Auth Client
 
-#### Request Headers
 ```javascript
-{
-  "Content-Type": "application/json",
-  "X-API-Key": process.env.NEXT_PUBLIC_API_KEY
-}
+// lib/auth-client.js
+import { createAuthClient } from 'better-auth/client';
+
+export const authClient = createAuthClient({
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001',
+});
+
+export const { signIn, signUp, signOut, getSession, useSession } = authClient;
 ```
 
-#### Request Body
-```javascript
-{
-  "email": "user@example.com",
-  "name": "John Doe",
-  "password": "securePassword123",
-  "profilePicture": "optional-profile-picture-url"
-}
-```
+---
 
-#### Response
-```javascript
-{
-  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "user": {
-    "id": "clx1234567890",
-    "email": "user@example.com",
-    "name": "John Doe",
-    "type": "DEVELOPER",
-    "role": null
-  }
-}
-```
+## Authentication Flow
 
-#### Frontend Implementation Example
+### 1. Registration
+
+#### Better Auth Registration
 ```javascript
-const register = async (userData) => {
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/register`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-API-Key': process.env.NEXT_PUBLIC_API_KEY
-    },
-    body: JSON.stringify(userData)
+// components/auth/RegisterForm.js
+import { useState } from 'react';
+import { authClient } from '../../lib/auth-client';
+
+export default function RegisterForm() {
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    password: '',
   });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  if (!response.ok) {
-    throw new Error('Registration failed');
-  }
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
 
-  const data = await response.json();
-  
-  // Store JWT token
-  localStorage.setItem('accessToken', data.accessToken);
-  localStorage.setItem('user', JSON.stringify(data.user));
-  
-  return data;
-};
-```
+    try {
+      const { data, error } = await authClient.signUp.email({
+        email: formData.email,
+        password: formData.password,
+        name: formData.name,
+      });
 
----
+      if (error) {
+        setError(error.message);
+        return;
+      }
 
-## Login Flow
-
-### Endpoint: `POST /auth/login`
-
-#### Request Headers
-```javascript
-{
-  "Content-Type": "application/json",
-  "X-API-Key": process.env.NEXT_PUBLIC_API_KEY
-}
-```
-
-#### Request Body
-```javascript
-{
-  "email": "user@example.com",
-  "password": "securePassword123"
-}
-```
-
-#### Response
-```javascript
-{
-  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "user": {
-    "id": "clx1234567890",
-    "email": "user@example.com",
-    "name": "John Doe",
-    "type": "DEVELOPER",
-    "role": null
-  }
-}
-```
-
-#### Frontend Implementation Example
-```javascript
-const login = async (credentials) => {
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/login`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-API-Key': process.env.NEXT_PUBLIC_API_KEY
-    },
-    body: JSON.stringify(credentials)
-  });
-
-  if (!response.ok) {
-    throw new Error('Login failed');
-  }
-
-  const data = await response.json();
-  
-  // Store JWT token
-  localStorage.setItem('accessToken', data.accessToken);
-  localStorage.setItem('user', JSON.stringify(data.user));
-  
-  return data;
-};
-```
-
----
-
-## GitHub OAuth Flow
-
-### Step 1: Initiate GitHub OAuth
-#### Endpoint: `GET /auth/github`
-
-```javascript
-const githubLogin = () => {
-  window.location.href = `${process.env.NEXT_PUBLIC_API_URL}/auth/github`;
-};
-```
-
-### Step 2: Handle Callback
-#### Endpoint: `GET /auth/github/callback`
-
-The backend automatically redirects to: `${FRONTEND_URL}/auth/callback?token=<jwt_token>`
-
-#### Frontend Callback Handler
-```javascript
-// In your /auth/callback page
-const handleGithubCallback = () => {
-  const urlParams = new URLSearchParams(window.location.search);
-  const token = urlParams.get('token');
-  
-  if (token) {
-    localStorage.setItem('accessToken', token);
-    
-    // Fetch user profile
-    fetchUserProfile().then(user => {
-      localStorage.setItem('user', JSON.stringify(user));
-      // Redirect to dashboard
+      // Registration successful - session is automatically managed
       window.location.href = '/dashboard';
+    } catch (err) {
+      setError('Registration failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <div>
+        <label>Name:</label>
+        <input
+          type="text"
+          value={formData.name}
+          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+          required
+        />
+      </div>
+      <div>
+        <label>Email:</label>
+        <input
+          type="email"
+          value={formData.email}
+          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+          required
+        />
+      </div>
+      <div>
+        <label>Password:</label>
+        <input
+          type="password"
+          value={formData.password}
+          onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+          required
+        />
+      </div>
+      {error && <div className="error">{error}</div>}
+      <button type="submit" disabled={loading}>
+        {loading ? 'Creating Account...' : 'Sign Up'}
+      </button>
+    </form>
+  );
+}
+```
+
+### 2. Login
+
+#### Better Auth Login
+```javascript
+// components/auth/LoginForm.js
+import { useState } from 'react';
+import { authClient } from '../../lib/auth-client';
+
+export default function LoginForm() {
+  const [credentials, setCredentials] = useState({
+    email: '',
+    password: '',
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      const { data, error } = await authClient.signIn.email({
+        email: credentials.email,
+        password: credentials.password,
+      });
+
+      if (error) {
+        setError(error.message);
+        return;
+      }
+
+      // Login successful - session is automatically managed
+      window.location.href = '/dashboard';
+    } catch (err) {
+      setError('Login failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGitHubLogin = async () => {
+    try {
+      await authClient.signIn.social({
+        provider: 'github',
+        callbackURL: `${window.location.origin}/auth/callback`,
+      });
+    } catch (err) {
+      setError('GitHub login failed. Please try again.');
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <div>
+        <label>Email:</label>
+        <input
+          type="email"
+          value={credentials.email}
+          onChange={(e) => setCredentials({ ...credentials, email: e.target.value })}
+          required
+        />
+      </div>
+      <div>
+        <label>Password:</label>
+        <input
+          type="password"
+          value={credentials.password}
+          onChange={(e) => setCredentials({ ...credentials, password: e.target.value })}
+          required
+        />
+      </div>
+      {error && <div className="error">{error}</div>}
+      <button type="submit" disabled={loading}>
+        {loading ? 'Signing In...' : 'Sign In'}
+      </button>
+      <button type="button" onClick={handleGitHubLogin}>
+        Sign In with GitHub
+      </button>
+    </form>
+  );
+}
+```
+
+### 3. GitHub OAuth Flow
+
+#### OAuth Integration (Automatic)
+```javascript
+// GitHub OAuth is handled automatically by Better Auth
+// Just call the social sign-in method
+
+const handleGitHubLogin = async () => {
+  try {
+    await authClient.signIn.social({
+      provider: 'github',
+      callbackURL: `${window.location.origin}/auth/callback`,
+    });
+  } catch (err) {
+    console.error('GitHub login failed:', err);
+  }
+};
+```
+
+#### OAuth Callback Handler
+```javascript
+// pages/auth/callback.js (Next.js)
+import { useEffect } from 'react';
+import { authClient } from '../../lib/auth-client';
+
+export default function AuthCallback() {
+  useEffect(() => {
+    const handleCallback = async () => {
+      try {
+        // Better Auth automatically handles the OAuth callback
+        const { data: session } = await authClient.getSession();
+
+        if (session) {
+          window.location.href = '/dashboard';
+        } else {
+          window.location.href = '/login?error=callback_failed';
+        }
+      } catch (error) {
+        window.location.href = '/login?error=callback_failed';
+      }
+    };
+
+    handleCallback();
+  }, []);
+
+  return <div>Processing authentication...</div>;
+}
+```
+
+---
+
+## Session Management
+
+### Session Hook (React)
+```javascript
+// hooks/useAuth.js
+import { useEffect, useState } from 'react';
+import { authClient } from '../lib/auth-client';
+
+export function useAuth() {
+  const [session, setSession] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const checkSession = async () => {
+      try {
+        const { data, error } = await authClient.getSession();
+
+        if (mounted) {
+          if (error) {
+            setError(error);
+          } else {
+            setSession(data);
+          }
+          setLoading(false);
+        }
+      } catch (err) {
+        if (mounted) {
+          setError(err);
+          setLoading(false);
+        }
+      }
+    };
+
+    checkSession();
+
+    // Listen for session changes
+    const unsubscribe = authClient.onSessionChange((session) => {
+      if (mounted) {
+        setSession(session);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
+  }, []);
+
+  const signOut = async () => {
+    try {
+      await authClient.signOut();
+      setSession(null);
+    } catch (err) {
+      setError(err);
+    }
+  };
+
+  return {
+    session,
+    user: session?.user,
+    loading,
+    error,
+    signOut,
+    isAuthenticated: !!session,
+  };
+}
+```
+
+### Auth Context Provider
+```javascript
+// contexts/AuthContext.js
+import { createContext, useContext } from 'react';
+import { useAuth } from '../hooks/useAuth';
+
+const AuthContext = createContext();
+
+export function AuthProvider({ children }) {
+  const auth = useAuth();
+  return <AuthContext.Provider value={auth}>{children}</AuthContext.Provider>;
+}
+
+export function useAuthContext() {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuthContext must be used within AuthProvider');
+  }
+  return context;
+}
+```
+
+---
+
+## API Integration
+
+### API Client with Better Auth
+```javascript
+// lib/api-client.js
+import { authClient } from './auth-client';
+
+class ApiClient {
+  constructor(baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001') {
+    this.baseURL = baseURL;
+  }
+
+  async request(endpoint, options = {}) {
+    const url = `${this.baseURL}${endpoint}`;
+
+    // Get session for authentication
+    const { data: session } = await authClient.getSession();
+
+    const config = {
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+      credentials: 'include', // Important for Better Auth cookies
+      ...options,
+    };
+
+    // Add session token if available
+    if (session?.token) {
+      config.headers.Authorization = `Bearer ${session.token}`;
+    }
+
+    const response = await fetch(url, config);
+
+    if (response.status === 401) {
+      // Session expired, redirect to login
+      await authClient.signOut();
+      window.location.href = '/login';
+      return;
+    }
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return response.json();
+  }
+
+  get(endpoint, options = {}) {
+    return this.request(endpoint, { ...options, method: 'GET' });
+  }
+
+  post(endpoint, data, options = {}) {
+    return this.request(endpoint, {
+      ...options,
+      method: 'POST',
+      body: JSON.stringify(data),
     });
   }
+
+  patch(endpoint, data, options = {}) {
+    return this.request(endpoint, {
+      ...options,
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  delete(endpoint, options = {}) {
+    return this.request(endpoint, { ...options, method: 'DELETE' });
+  }
+}
+
+export const apiClient = new ApiClient();
+```
+
+### Service Layer Example
+```javascript
+// services/userService.js
+import { apiClient } from '../lib/api-client';
+
+export const userService = {
+  async getProfile() {
+    return apiClient.get('/auth/profile');
+  },
+
+  async updateProfile(userData) {
+    return apiClient.patch('/users/me', userData);
+  },
+
+  async getUsers(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    return apiClient.get(`/users?${query}`);
+  },
+
+  async deleteUser(userId) {
+    return apiClient.delete(`/users/${userId}`);
+  },
 };
 ```
 
----
-
-## API Call Patterns
-
-### 1. Public Endpoints (No Authentication Required)
+### Route Protection
 ```javascript
-// Example: Get all users (public)
-const getUsers = async () => {
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users`);
-  return response.json();
-};
-```
+// components/auth/ProtectedRoute.js
+import { useAuthContext } from '../../contexts/AuthContext';
+import { useRouter } from 'next/router';
+import { useEffect } from 'react';
 
-### 2. Frontend-Only Endpoints (API Key Required)
-```javascript
-// Example: Frontend health check
-const checkFrontendHealth = async () => {
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/frontend/auth-test`, {
-    headers: {
-      'X-API-Key': process.env.NEXT_PUBLIC_API_KEY
+export default function ProtectedRoute({ children }) {
+  const { isAuthenticated, loading } = useAuthContext();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && !isAuthenticated) {
+      router.push('/login');
     }
-  });
-  return response.json();
-};
+  }, [isAuthenticated, loading, router]);
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
+
+  return children;
+}
 ```
-
-### 3. User-Protected Endpoints (JWT Required)
-```javascript
-// Example: Get user profile
-const getUserProfile = async () => {
-  const token = localStorage.getItem('accessToken');
-  
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/profile`, {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'X-API-Key': process.env.NEXT_PUBLIC_API_KEY
-    }
-  });
-  
-  return response.json();
-};
-```
-
-### 4. Mixed Authentication (API Key + JWT)
-```javascript
-// Example: Update user profile
-const updateUserProfile = async (userId, userData) => {
-  const token = localStorage.getItem('accessToken');
-  
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users/${userId}`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-      'X-API-Key': process.env.NEXT_PUBLIC_API_KEY
-    },
-    body: JSON.stringify(userData)
-  });
-  
-  return response.json();
-};
-```
-
----
-
-## Header Requirements
-
-### Standard Headers for All Requests
-```javascript
-const getStandardHeaders = () => ({
-  'Content-Type': 'application/json',
-  'X-API-Key': process.env.NEXT_PUBLIC_API_KEY
-});
-```
-
-### Authenticated Headers
-```javascript
-const getAuthenticatedHeaders = () => {
-  const token = localStorage.getItem('accessToken');
-  return {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`,
-    'X-API-Key': process.env.NEXT_PUBLIC_API_KEY
-  };
-};
-```
-
----
-
-## Route Guards
-
-### Backend Guards Applied to Routes
-
-#### 1. Public Routes (No Guard)
-- `GET /users` - Get all users
-- `GET /users/:id` - Get user by ID
-- `POST /users` - Create user
-
-#### 2. API Key Protected Routes
-- `GET /frontend/health` - No authentication
-- `GET /frontend/auth-test` - API Key required
-
-#### 3. JWT Protected Routes
-- `GET /auth/profile` - User authentication required
-- `PATCH /users/:id` - User authentication required
-- `DELETE /users/:id` - User authentication required
-- `GET /upload/presigned-url` - User authentication required
-- `POST /projects` - User authentication required
-- `GET /projects/:id` - User authentication required
-- `PATCH /projects/:id` - User authentication required
-- `DELETE /projects/:id` - User authentication required
-- `POST /issues` - User authentication required
-- `GET /issues/:id` - User authentication required
-- `PATCH /issues/:id` - User authentication required
-- `POST /chat/conversations` - User authentication required
-- `GET /github/repos` - User authentication required
 
 ---
 
 ## Error Handling
 
-### Common Error Responses
-
-#### 401 Unauthorized
+### Error Handling Hook
 ```javascript
-{
-  "statusCode": 401,
-  "message": "Unauthorized",
-  "error": "Unauthorized"
-}
-```
+// hooks/useErrorHandler.js
+import { useState, useCallback } from 'react';
 
-#### 401 Invalid API Key
-```javascript
-{
-  "statusCode": 401,
-  "message": "Invalid API Key",
-  "error": "Unauthorized"
-}
-```
+export function useErrorHandler() {
+  const [error, setError] = useState(null);
 
-#### 401 Invalid JWT Token
-```javascript
-{
-  "statusCode": 401,
-  "message": "Invalid JWT token",
-  "error": "Unauthorized"
-}
-```
+  const handleError = useCallback((error) => {
+    console.error('Error:', error);
 
-### Frontend Error Handling Example
-```javascript
-const apiCall = async (url, options = {}) => {
-  try {
-    const response = await fetch(url, options);
-    
-    if (response.status === 401) {
-      // Handle authentication error
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
-      return;
+    if (error.message?.includes('unauthorized')) {
+      // Handle auth errors
+      setError('Authentication failed. Please sign in again.');
+    } else if (error.message?.includes('network')) {
+      // Handle network errors
+      setError('Network error. Please check your connection.');
+    } else {
+      // Handle other errors
+      setError(error.message || 'An unexpected error occurred.');
     }
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
-    return await response.json();
-  } catch (error) {
-    console.error('API call failed:', error);
-    throw error;
+  }, []);
+
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+
+  return { error, handleError, clearError };
+}
+```
+
+### Error Boundary Component
+```javascript
+// components/ErrorBoundary.js
+import React from 'react';
+
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
   }
-};
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('Better Auth Error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="error-boundary">
+          <h2>Authentication Error</h2>
+          <p>Something went wrong with authentication.</p>
+          <button onClick={() => window.location.reload()}>Reload Page</button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+export default ErrorBoundary;
 ```
 
 ---
 
 ## Example Implementation
 
-### Complete Auth Service
+### Complete App Setup
 ```javascript
-// services/authService.js
-class AuthService {
-  constructor() {
-    this.baseURL = process.env.NEXT_PUBLIC_API_URL;
-    this.apiKey = process.env.NEXT_PUBLIC_API_KEY;
-  }
+// pages/_app.js (Next.js)
+import { AuthProvider } from '../contexts/AuthContext';
+import ErrorBoundary from '../components/ErrorBoundary';
+import '../styles/globals.css';
 
-  async register(userData) {
-    const response = await fetch(`${this.baseURL}/auth/register`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': this.apiKey
-      },
-      body: JSON.stringify(userData)
-    });
-
-    if (!response.ok) {
-      throw new Error('Registration failed');
-    }
-
-    const data = await response.json();
-    this.setAuthData(data);
-    return data;
-  }
-
-  async login(credentials) {
-    const response = await fetch(`${this.baseURL}/auth/login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': this.apiKey
-      },
-      body: JSON.stringify(credentials)
-    });
-
-    if (!response.ok) {
-      throw new Error('Login failed');
-    }
-
-    const data = await response.json();
-    this.setAuthData(data);
-    return data;
-  }
-
-  async getProfile() {
-    const token = this.getToken();
-    
-    if (!token) {
-      throw new Error('No authentication token');
-    }
-
-    const response = await fetch(`${this.baseURL}/auth/profile`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'X-API-Key': this.apiKey
-      }
-    });
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        this.clearAuthData();
-      }
-      throw new Error('Failed to fetch profile');
-    }
-
-    return await response.json();
-  }
-
-  setAuthData(data) {
-    localStorage.setItem('accessToken', data.accessToken);
-    localStorage.setItem('user', JSON.stringify(data.user));
-  }
-
-  clearAuthData() {
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('user');
-  }
-
-  getToken() {
-    return localStorage.getItem('accessToken');
-  }
-
-  getUser() {
-    const user = localStorage.getItem('user');
-    return user ? JSON.parse(user) : null;
-  }
-
-  isAuthenticated() {
-    return !!this.getToken();
-  }
-
-  logout() {
-    this.clearAuthData();
-    window.location.href = '/login';
-  }
+export default function App({ Component, pageProps }) {
+  return (
+    <ErrorBoundary>
+      <AuthProvider>
+        <Component {...pageProps} />
+      </AuthProvider>
+    </ErrorBoundary>
+  );
 }
-
-export default new AuthService();
 ```
 
-### API Client with Auto-Authentication
+### Dashboard Component
 ```javascript
-// services/apiClient.js
-import authService from './authService';
+// pages/dashboard.js
+import { useAuthContext } from '../contexts/AuthContext';
+import ProtectedRoute from '../components/auth/ProtectedRoute';
 
-class ApiClient {
-  constructor() {
-    this.baseURL = process.env.NEXT_PUBLIC_API_URL;
-    this.apiKey = process.env.NEXT_PUBLIC_API_KEY;
-  }
+export default function Dashboard() {
+  const { user, signOut } = useAuthContext();
 
-  async request(endpoint, options = {}) {
-    const url = `${this.baseURL}${endpoint}`;
-    
-    const config = {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': this.apiKey,
-        ...options.headers
-      }
-    };
+  return (
+    <ProtectedRoute>
+      <div>
+        <h1>Dashboard</h1>
+        <p>Welcome, {user?.name}!</p>
+        <button onClick={signOut}>Sign Out</button>
+      </div>
+    </ProtectedRoute>
+  );
+}
+```
 
-    // Add JWT token if available
-    const token = authService.getToken();
-    if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`;
-    }
-
-    const response = await fetch(url, config);
-
-    if (response.status === 401) {
-      authService.logout();
-      return;
-    }
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    return await response.json();
-  }
-
-  get(endpoint) {
-    return this.request(endpoint);
-  }
-
-  post(endpoint, data) {
-    return this.request(endpoint, {
-      method: 'POST',
-      body: JSON.stringify(data)
-    });
-  }
-
-  patch(endpoint, data) {
-    return this.request(endpoint, {
-      method: 'PATCH',
-      body: JSON.stringify(data)
-    });
-  }
-
-  delete(endpoint) {
-    return this.request(endpoint, {
-      method: 'DELETE'
-    });
-  }
+### TypeScript Support
+```typescript
+// types/auth.ts
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  profilePicture?: string;
+  githubId?: string;
+  githubUsername?: string;
+  githubConnected?: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
-export default new ApiClient();
+export interface Session {
+  user: User;
+  token: string;
+  expiresAt: string;
+}
+
+export interface AuthState {
+  session: Session | null;
+  user: User | null;
+  loading: boolean;
+  error: string | null;
+  isAuthenticated: boolean;
+}
 ```
 
 ---
@@ -580,54 +710,141 @@ export default new ApiClient();
 ## Migration Checklist
 
 ### ✅ Environment Setup
-- [ ] Add `NEXT_PUBLIC_API_KEY` to frontend environment
-- [ ] Update `NEXT_PUBLIC_API_URL` to production endpoint
-- [ ] Verify `FRONTEND_API_KEY` is set in backend environment
+- [ ] Remove legacy environment variables (`NEXT_PUBLIC_API_KEY`, `NEXT_PUBLIC_JWT_SECRET`)
+- [ ] Add `NEXT_PUBLIC_API_URL` to frontend environment
+- [ ] Add `NEXT_PUBLIC_GITHUB_CLIENT_ID` to frontend environment
+- [ ] Verify backend Better Auth configuration is complete
+
+### ✅ Dependency Management
+- [ ] Install Better Auth client: `npm install better-auth`
+- [ ] Remove legacy auth libraries if any
+- [ ] Update package.json dependencies
+
+### ✅ Code Migration
+- [ ] Remove all `localStorage` token management code
+- [ ] Remove manual `X-API-Key` header implementations
+- [ ] Remove manual `Authorization: Bearer` header implementations
+- [ ] Replace with Better Auth client calls
 
 ### ✅ Authentication Flow
-- [ ] Update registration component to use new API structure
-- [ ] Update login component to use new API structure
-- [ ] Implement GitHub OAuth callback handler
-- [ ] Add JWT token storage and management
+- [ ] Update registration component to use Better Auth
+- [ ] Update login component to use Better Auth
+- [ ] Implement Better Auth OAuth callback handler
+- [ ] Replace manual session management with Better Auth hooks
 
 ### ✅ API Integration
-- [ ] Add `X-API-Key` header to all API requests
-- [ ] Update authenticated requests to use `Authorization: Bearer <token>`
-- [ ] Implement automatic token refresh logic
-- [ ] Add proper error handling for 401 responses
+- [ ] Update API client to use Better Auth sessions
+- [ ] Add `credentials: 'include'` to fetch requests
+- [ ] Remove manual token handling from API calls
+- [ ] Update error handling for Better Auth responses
 
 ### ✅ Route Protection
-- [ ] Implement frontend route guards
-- [ ] Add authentication state management
-- [ ] Handle automatic logout on token expiry
-- [ ] Add loading states for authentication checks
+- [ ] Implement Better Auth route guards
+- [ ] Update authentication state management
+- [ ] Replace manual session checks with Better Auth hooks
+- [ ] Add Better Auth context provider
 
 ### ✅ Testing
-- [ ] Test registration flow
-- [ ] Test login flow
-- [ ] Test GitHub OAuth flow
+- [ ] Test registration flow with Better Auth
+- [ ] Test login flow with Better Auth
+- [ ] Test GitHub OAuth flow with Better Auth
 - [ ] Test protected route access
-- [ ] Test error handling
+- [ ] Test session persistence across page refreshes
 - [ ] Test logout functionality
 
 ---
 
-## Security Considerations
+## Key Differences from Legacy System
 
-1. **API Key Security**: Never expose the API key in client-side code logs
-2. **JWT Token Storage**: Consider using httpOnly cookies for enhanced security
-3. **Token Expiry**: Implement automatic token refresh before expiry
-4. **HTTPS Only**: Always use HTTPS in production
-5. **Error Handling**: Don't expose sensitive error information to users
+### What's Changed
+1. **No Manual Token Management**: Better Auth handles all tokens automatically
+2. **Cookie-Based Sessions**: Sessions are managed via secure cookies
+3. **No API Keys**: No need for `X-API-Key` headers
+4. **Automatic CSRF Protection**: Built-in security features
+5. **Simplified OAuth**: GitHub OAuth is handled automatically
+
+### What's Removed
+- `localStorage.setItem('accessToken', ...)` ❌
+- `localStorage.setItem('user', ...)` ❌
+- `headers: { 'X-API-Key': ... }` ❌
+- `headers: { 'Authorization': 'Bearer ...' }` ❌
+- Manual OAuth callback handling ❌
+
+### What's Added
+- `authClient.signIn.email()` ✅
+- `authClient.signUp.email()` ✅
+- `authClient.getSession()` ✅
+- `authClient.signOut()` ✅
+- `credentials: 'include'` in fetch requests ✅
 
 ---
 
-## Support
+## Migration Support
 
-For questions or issues with the authentication migration:
-1. Check the API documentation at `/api` (Swagger UI)
-2. Review the backend logs for detailed error messages
-3. Test endpoints using the provided examples
-4. Ensure environment variables are correctly configured
+### Troubleshooting Common Issues
 
-This guide covers all aspects of the authentication system migration. Follow the examples and patterns provided for a smooth transition to the new authentication flow.
+1. **Sessions not persisting**: Ensure `credentials: 'include'` is set in all fetch requests
+2. **OAuth callback fails**: Verify callback URLs are correctly configured in GitHub app settings
+3. **CORS errors**: Check that `trustedOrigins` includes your frontend URL in Better Auth config
+4. **404 on auth endpoints**: Better Auth endpoints are at `/api/auth/*`, not `/auth/*`
+
+### Debug Mode
+```javascript
+// lib/auth-client.js
+export const authClient = createAuthClient({
+  baseURL: process.env.NEXT_PUBLIC_API_URL,
+  debug: process.env.NODE_ENV === 'development',
+});
+```
+
+### Support Resources
+- [Better Auth Documentation](https://better-auth.com/docs)
+- [API Documentation](http://localhost:3001/api) (Swagger UI)
+- [GitHub Repository Issues](https://github.com/better-auth/better-auth/issues)
+
+---
+
+## Complete Migration Example
+
+### Before (Legacy)
+```javascript
+// ❌ Legacy implementation
+const login = async (credentials) => {
+  const response = await fetch('/auth/login', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-API-Key': process.env.NEXT_PUBLIC_API_KEY
+    },
+    body: JSON.stringify(credentials)
+  });
+  
+  const data = await response.json();
+  localStorage.setItem('accessToken', data.accessToken);
+  return data;
+};
+```
+
+### After (Better Auth)
+```javascript
+// ✅ Better Auth implementation
+const login = async (credentials) => {
+  const { data, error } = await authClient.signIn.email({
+    email: credentials.email,
+    password: credentials.password,
+  });
+  
+  if (error) {
+    throw new Error(error.message);
+  }
+  
+  // Session is automatically managed - no manual storage needed
+  return data;
+};
+```
+
+This migration guide provides a complete transition path from the legacy authentication system to Better Auth. The new system is more secure, easier to maintain, and provides a better developer experience.
+
+---
+
+**🚀 Ready to migrate? Start with the [Migration Checklist](#migration-checklist) and follow the examples in this guide!**

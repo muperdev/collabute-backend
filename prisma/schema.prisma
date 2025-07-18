@@ -8,7 +8,7 @@ datasource db {
 }
 
 model User {
-  id             String    @id @default(cuid())
+  id             Int       @id @default(autoincrement())
   email          String    @unique
   name           String
   password       String?
@@ -19,39 +19,16 @@ model User {
   country        String?
   industry       String?
   role           Role?     @relation(fields: [roleId], references: [id])
-  roleId         String?
+  roleId         Int?
   isVerified     Boolean   @default(false)
   kycStatus      KycStatus @default(PENDING)
   earlybird      Boolean   @default(false)
   wallet         Float     @default(0)
 
-  // GitHub Integration
-  githubId             String?      @unique
-  githubUsername       String?
-  githubConnected      Boolean      @default(false)
-  githubConnectedAt    DateTime?
-  githubAccessToken    String?
-  githubInstallationId String?
-  githubLastFetch      DateTime?
-  githubRepositories   GitHubRepo[]
-
-  // Developer Fields
-  bio                 String?
-  skills              Skill[]
-  experience          Int?
-  experienceLevel     ExperienceLevel?
-  availability        Availability?
-  preferredWorkType   WorkType?
-  hourlyRate          Float?
-  stripeAccountId     String?
-  stripeAccountStatus StripeStatus     @default(PENDING)
-
-  // Lead Fields
-  specializations  Stack[]
-  title            String?
-  location         String?
-  calendar         Calendar[]
-  preferredPayment PaymentMethod?
+  // Profile relationships
+  developerProfile  DeveloperProfile?
+  leadProfile       LeadProfile?
+  githubIntegration GitHubIntegration?
 
   // Relationships
   ownedProjects         Project[]                 @relation("ProjectOwner")
@@ -73,7 +50,7 @@ model User {
 }
 
 model Role {
-  id          String  @id @default(cuid())
+  id          Int     @id @default(autoincrement())
   name        String  @unique
   displayName String
   description String?
@@ -88,7 +65,7 @@ model Role {
 }
 
 model Project {
-  id              String        @id @default(cuid())
+  id              Int           @id @default(autoincrement())
   title           String
   slug            String        @unique
   description     String
@@ -103,9 +80,9 @@ model Project {
 
   // Owner and Team
   owner         User                  @relation("ProjectOwner", fields: [ownerId], references: [id])
-  ownerId       String
+  ownerId       Int
   teamLead      User?                 @relation("TeamLead", fields: [teamLeadId], references: [id])
-  teamLeadId    String?
+  teamLeadId    Int?
   collaborators ProjectCollaborator[]
 
   // Technical
@@ -119,7 +96,7 @@ model Project {
 
   // Product Association
   product   Product? @relation(fields: [productId], references: [id])
-  productId String?
+  productId Int?
 
   // Conversations
   conversations Conversation[]
@@ -132,7 +109,7 @@ model Project {
 }
 
 model Issue {
-  id              String          @id @default(cuid())
+  id              Int             @id @default(autoincrement())
   title           String
   slug            String          @unique
   description     String?
@@ -150,10 +127,10 @@ model Issue {
 
   // Relationships
   project    Project @relation(fields: [projectId], references: [id])
-  projectId  String
+  projectId  Int
   assignees  User[]
   reporter   User    @relation("IssueReporter", fields: [reporterId], references: [id])
-  reporterId String
+  reporterId Int
 
   // Collaboration
   collaborationRequests CollaborationRequest[]
@@ -167,11 +144,11 @@ model Issue {
 }
 
 model CollaborationRequest {
-  id              String              @id @default(cuid())
+  id              Int                 @id @default(autoincrement())
   developer       User                @relation(fields: [developerId], references: [id])
-  developerId     String
+  developerId     Int
   issue           Issue               @relation(fields: [issueId], references: [id])
-  issueId         String
+  issueId         Int
   percentageShare Float
   taskDefinition  String?
   status          CollaborationStatus @default(PENDING)
@@ -181,7 +158,7 @@ model CollaborationRequest {
 }
 
 model GitHubRepository {
-  id            String  @id @default(cuid())
+  id            Int     @id @default(autoincrement())
   repoId        String  @unique
   name          String
   fullName      String
@@ -193,7 +170,7 @@ model GitHubRepository {
 
   // Project association
   project   Project? @relation(fields: [projectId], references: [id])
-  projectId String?  @unique
+  projectId Int?     @unique
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -203,7 +180,7 @@ model GitHubRepository {
 }
 
 model Conversation {
-  id           String           @id @default(cuid())
+  id           Int              @id @default(autoincrement())
   title        String
   name         String?
   type         ConversationType @default(PRIVATE)
@@ -217,11 +194,11 @@ model Conversation {
   participants  ConversationParticipant[]
   messages      Message[]
   project       Project?                  @relation(fields: [projectId], references: [id])
-  projectId     String?
+  projectId     Int?
   createdBy     User?                     @relation(fields: [createdById], references: [id])
-  createdById   String?
+  createdById   Int?
   lastMessage   Message?                  @relation("LastMessage", fields: [lastMessageId], references: [id])
-  lastMessageId String?
+  lastMessageId Int?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -230,17 +207,17 @@ model Conversation {
 }
 
 model Message {
-  id      String      @id @default(cuid())
+  id      Int         @id @default(autoincrement())
   content String
   type    MessageType @default(TEXT)
 
   // Relationships
   conversation   Conversation @relation(fields: [conversationId], references: [id])
-  conversationId String
+  conversationId Int
   sender         User         @relation(fields: [senderId], references: [id])
-  senderId       String
+  senderId       Int
   replyTo        Message?     @relation("MessageReply", fields: [replyToId], references: [id])
-  replyToId      String?
+  replyToId      Int?
   replies        Message[]    @relation("MessageReply")
 
   // Media
@@ -265,30 +242,28 @@ model Message {
 // Junction Tables and Supporting Models
 
 model ProjectCollaborator {
-  id        String             @id @default(cuid())
-  project   Project            @relation(fields: [projectId], references: [id])
-  projectId String
-  user      User               @relation(fields: [userId], references: [id])
-  userId    String
-  role      CollaboratorRole   @default(MEMBER)
-  status    CollaboratorStatus @default(ACTIVE)
-  joinedAt  DateTime           @default(now())
+  id        Int      @id @default(autoincrement())
+  project   Project  @relation(fields: [projectId], references: [id])
+  projectId Int
+  user      User     @relation(fields: [userId], references: [id])
+  userId    Int
+  joinedAt  DateTime @default(now())
 
   @@unique([projectId, userId])
   @@map("project_collaborators")
 }
 
 model ConversationParticipant {
-  id                String            @id @default(cuid())
+  id                Int               @id @default(autoincrement())
   conversation      Conversation      @relation(fields: [conversationId], references: [id])
-  conversationId    String
+  conversationId    Int
   user              User              @relation(fields: [userId], references: [id])
-  userId            String
+  userId            Int
   role              ParticipantRole   @default(MEMBER)
   joinedAt          DateTime          @default(now())
   leftAt            DateTime?
   lastReadMessage   Message?          @relation(fields: [lastReadMessageId], references: [id])
-  lastReadMessageId String?
+  lastReadMessageId Int?
   notifications     NotificationLevel @default(ALL)
 
   @@unique([conversationId, userId])
@@ -296,9 +271,9 @@ model ConversationParticipant {
 }
 
 model Transaction {
-  id          String            @id @default(cuid())
+  id          Int               @id @default(autoincrement())
   user        User              @relation(fields: [userId], references: [id])
-  userId      String
+  userId      Int
   amount      Float
   type        TransactionType
   method      PaymentMethod
@@ -306,7 +281,7 @@ model Transaction {
   reference   String?
   description String?
   project     Project?          @relation(fields: [projectId], references: [id])
-  projectId   String?
+  projectId   Int?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -317,7 +292,7 @@ model Transaction {
 // Supporting models
 
 model Product {
-  id       String    @id @default(cuid())
+  id       Int       @id @default(autoincrement())
   name     String
   projects Project[]
 
@@ -327,65 +302,120 @@ model Product {
   @@map("products")
 }
 
+model DeveloperProfile {
+  id                  Int              @id @default(autoincrement())
+  user                User             @relation(fields: [userId], references: [id])
+  userId              Int              @unique
+  bio                 String?
+  experience          Int?
+  experienceLevel     ExperienceLevel?
+  availability        Availability?
+  preferredWorkType   WorkType?
+  hourlyRate          Float?
+  stripeAccountId     String?
+  stripeAccountStatus StripeStatus     @default(PENDING)
+  skills              Skill[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("developer_profiles")
+}
+
+model LeadProfile {
+  id               Int            @id @default(autoincrement())
+  user             User           @relation(fields: [userId], references: [id])
+  userId           Int            @unique
+  title            String?
+  location         String?
+  preferredPayment PaymentMethod?
+  specializations  Stack[]
+  calendar         Calendar[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("lead_profiles")
+}
+
+model GitHubIntegration {
+  id                   Int          @id @default(autoincrement())
+  user                 User         @relation(fields: [userId], references: [id])
+  userId               Int          @unique
+  githubId             String?      @unique
+  githubUsername       String?
+  githubConnected      Boolean      @default(false)
+  githubConnectedAt    DateTime?
+  githubAccessToken    String?
+  githubInstallationId String?
+  githubLastFetch      DateTime?
+  githubRepositories   GitHubRepo[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("github_integrations")
+}
+
 model GitHubRepo {
-  id     String @id @default(cuid())
-  user   User   @relation(fields: [userId], references: [id])
-  userId String
-  repoId String
-  name   String
+  id                  Int               @id @default(autoincrement())
+  githubIntegration   GitHubIntegration @relation(fields: [githubIntegrationId], references: [id])
+  githubIntegrationId Int
+  repoId              String
+  name                String
 
   @@map("github_repos")
 }
 
 model Skill {
-  id     String @id @default(cuid())
-  user   User   @relation(fields: [userId], references: [id])
-  userId String
-  name   String
+  id                 Int              @id @default(autoincrement())
+  developerProfile   DeveloperProfile @relation(fields: [developerProfileId], references: [id])
+  developerProfileId Int
+  name               String
 
   @@map("skills")
 }
 
 model Stack {
-  id     String @id @default(cuid())
-  user   User   @relation(fields: [userId], references: [id])
-  userId String
-  name   String
+  id            Int         @id @default(autoincrement())
+  leadProfile   LeadProfile @relation(fields: [leadProfileId], references: [id])
+  leadProfileId Int
+  name          String
 
   @@map("stacks")
 }
 
 model Calendar {
-  id     String   @id @default(cuid())
-  user   User     @relation(fields: [userId], references: [id])
-  userId String
-  date   DateTime
+  id            Int         @id @default(autoincrement())
+  leadProfile   LeadProfile @relation(fields: [leadProfileId], references: [id])
+  leadProfileId Int
+  date          DateTime
 
   @@map("calendars")
 }
 
 model ProjectStack {
-  id        String  @id @default(cuid())
+  id        Int     @id @default(autoincrement())
   project   Project @relation(fields: [projectId], references: [id])
-  projectId String
+  projectId Int
   name      String
 
   @@map("project_stacks")
 }
 
 model IssueRequest {
-  id      String @id @default(cuid())
+  id      Int    @id @default(autoincrement())
   issue   Issue  @relation(fields: [issueId], references: [id])
-  issueId String
+  issueId Int
   content String
 
   @@map("issue_requests")
 }
 
 model Payment {
-  id     String @id @default(cuid())
-  user   User   @relation(fields: [userId], references: [id])
-  userId String
+  id     Int   @id @default(autoincrement())
+  user   User  @relation(fields: [userId], references: [id])
+  userId Int
   amount Float
 
   @@map("payments")

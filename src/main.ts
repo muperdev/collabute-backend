@@ -24,7 +24,7 @@ async function bootstrap() {
       `
 # Collabute API Documentation
 
-A comprehensive GitHub collaboration platform API built with NestJS.
+A comprehensive GitHub collaboration platform API built with NestJS and Better Auth.
 
 ## Features
 - 🔐 **Authentication**: Better Auth with Email/Password + GitHub OAuth
@@ -34,15 +34,41 @@ A comprehensive GitHub collaboration platform API built with NestJS.
 - 💬 **Real-time Chat**: WebSocket-based messaging
 - 🔧 **Background Jobs**: Email, sync, and notification processing
 - 🌐 **GitHub Integration**: Comprehensive GitHub API integration
+- 🔒 **Role-based Access Control**: Admin, Moderator, and User roles
+- 🛡️ **Enhanced Security**: Built-in CSRF protection and secure sessions
+
+## Authentication System
+This API uses **Better Auth** for authentication management:
+
+### Traditional Endpoints (Legacy - Deprecated)
+- \`POST /auth/login\` - Login with email/password
+- \`POST /auth/register\` - Register new user
+- \`GET /auth/profile\` - Get user profile
+- \`POST /auth/logout\` - Logout user
+
+### Better Auth Endpoints (Recommended)
+- \`POST /api/auth/sign-in/email\` - Email/password login
+- \`POST /api/auth/sign-up/email\` - Email registration  
+- \`GET /api/auth/session\` - Get current session
+- \`POST /api/auth/sign-out\` - Sign out
+- \`GET /api/auth/github\` - GitHub OAuth login
+- \`GET /api/auth/github/callback\` - GitHub OAuth callback
 
 ## Getting Started
-1. **Authentication**: Use \`POST /auth/login\` to get JWT token
-2. **Authorization**: Add \`Authorization: Bearer <token>\` header
-3. **WebSocket**: Connect to \`/chat\` namespace for real-time features
+1. **Authentication**: Use Better Auth endpoints for session management
+2. **Session**: Sessions are managed via secure cookies
+3. **Authorization**: Add \`Authorization: Bearer <session-token>\` header for API access
+4. **WebSocket**: Connect to \`/chat\` namespace for real-time features
 
 ## Base URL
-- Development: \`http://localhost:3000\`
+- Development: \`http://localhost:3001\`
 - Production: \`https://api.collabute.com\`
+
+## Role-based Access Control
+- **Admin**: Full system access, user management, system configuration
+- **Moderator**: Content moderation, project management
+- **User**: Basic access to projects and issues
+- **Guest**: Limited read-only access
 
 ## Support
 - Documentation: [docs.collabute.com](https://docs.collabute.com)
@@ -50,28 +76,29 @@ A comprehensive GitHub collaboration platform API built with NestJS.
 - Support: support@collabute.com
     `,
     )
-    .setVersion('1.0.0')
+    .setVersion('2.0.0')
     .addBearerAuth(
       {
         type: 'http',
         scheme: 'bearer',
         bearerFormat: 'JWT',
-        name: 'JWT',
-        description: 'Enter JWT token',
+        name: 'Better Auth Session Token',
+        description: 'Enter Better Auth session token',
         in: 'header',
       },
-      'JWT-auth',
+      'BetterAuth',
     )
-    .addServer('http://localhost:3000', 'Development')
+    .addServer('http://localhost:3001', 'Development')
     .addServer('https://api.collabute.com', 'Production')
-    .addTag('auth', 'Authentication endpoints')
+    .addTag('auth', 'Authentication endpoints (Better Auth)')
     .addTag('users', 'User management')
     .addTag('projects', 'Project management')
     .addTag('issues', 'Issue tracking')
     .addTag('chat', 'Real-time messaging')
     .addTag('github', 'GitHub integration')
     .addTag('jobs', 'Background job management')
-    .addTag('frontend', 'Frontend authentication and utilities')
+    .addTag('upload', 'File upload and management')
+    .addTag('roles', 'Role and permission management')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
@@ -108,7 +135,7 @@ A comprehensive GitHub collaboration platform API built with NestJS.
     preflightContinue: false,
   });
 
-  await app.listen(process.env.PORT ?? 3000);
+  await app.listen(process.env.PORT ?? 3001);
   console.log(`Application is running on: ${await app.getUrl()}`);
 }
 bootstrap();

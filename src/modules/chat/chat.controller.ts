@@ -6,37 +6,31 @@ import {
   Param,
   Delete,
   Query,
-  UseGuards,
   Request as RequestDecorator,
 } from '@nestjs/common';
 import { Request } from 'express';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiQuery,
-  ApiBearerAuth,
-} from '@nestjs/swagger';
+import { ApiTags } from '@nestjs/swagger';
 import { ChatService } from './chat.service';
 import { CreateConversationDto, SendMessageDto } from './dto';
-import { BetterAuthGuard } from '../../common/guards/better-auth.guard';
+import {
+  createConversationDecorator,
+  findConversationsDecorator,
+  findConversationDecorator,
+  sendMessageDecorator,
+  getMessagesDecorator,
+  deleteMessageDecorator,
+  addParticipantDecorator,
+  removeParticipantDecorator,
+  markAsReadDecorator,
+} from './decorators/response.decorator';
 
 @ApiTags('chat')
 @Controller('chat')
-@UseGuards(BetterAuthGuard)
-@ApiBearerAuth()
 export class ChatController {
   constructor(private readonly chatService: ChatService) {}
 
   @Post('conversations')
-  @ApiOperation({ summary: 'Create a new conversation' })
-  @ApiResponse({
-    status: 201,
-    description: 'Conversation created successfully',
-  })
-  @ApiResponse({ status: 400, description: 'Bad request' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @createConversationDecorator()
   createConversation(
     @Body() createConversationDto: CreateConversationDto,
     @RequestDecorator() req: any,
@@ -48,51 +42,25 @@ export class ChatController {
   }
 
   @Get('conversations')
-  @ApiOperation({ summary: 'Get user conversations' })
-  @ApiQuery({ name: 'page', required: false, type: Number })
-  @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiQuery({ name: 'type', required: false, type: String })
-  @ApiQuery({ name: 'projectId', required: false, type: String })
-  @ApiResponse({
-    status: 200,
-    description: 'Conversations retrieved successfully',
-  })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @findConversationsDecorator()
   findConversations(@RequestDecorator() req: any, @Query() query: any) {
     return this.chatService.findConversations(req.user.id, query);
   }
 
   @Get('conversations/:id')
-  @ApiOperation({ summary: 'Get conversation by ID' })
-  @ApiResponse({
-    status: 200,
-    description: 'Conversation retrieved successfully',
-  })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Not a participant' })
-  @ApiResponse({ status: 404, description: 'Conversation not found' })
+  @findConversationDecorator()
   findConversation(@Param('id') id: string, @RequestDecorator() req: any) {
     return this.chatService.findConversation(id, req.user.id);
   }
 
   @Post('messages')
-  @ApiOperation({ summary: 'Send a message' })
-  @ApiResponse({ status: 201, description: 'Message sent successfully' })
-  @ApiResponse({ status: 400, description: 'Bad request' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Not a participant' })
+  @sendMessageDecorator()
   sendMessage(@Body() sendMessageDto: SendMessageDto, @RequestDecorator() req: any) {
     return this.chatService.sendMessage(sendMessageDto, req.user.id);
   }
 
   @Get('conversations/:id/messages')
-  @ApiOperation({ summary: 'Get conversation messages' })
-  @ApiQuery({ name: 'page', required: false, type: Number })
-  @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiResponse({ status: 200, description: 'Messages retrieved successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Not a participant' })
-  @ApiResponse({ status: 404, description: 'Conversation not found' })
+  @getMessagesDecorator()
   getMessages(
     @Param('id') conversationId: string,
     @RequestDecorator() req: any,
@@ -102,31 +70,13 @@ export class ChatController {
   }
 
   @Delete('messages/:id')
-  @ApiOperation({ summary: 'Delete a message' })
-  @ApiResponse({ status: 200, description: 'Message deleted successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({
-    status: 403,
-    description: 'Forbidden - Not authorized to delete this message',
-  })
-  @ApiResponse({ status: 404, description: 'Message not found' })
+  @deleteMessageDecorator()
   deleteMessage(@Param('id') messageId: string, @RequestDecorator() req: any) {
     return this.chatService.deleteMessage(messageId, req.user.id);
   }
 
   @Post('conversations/:id/participants')
-  @ApiOperation({ summary: 'Add participant to conversation' })
-  @ApiResponse({ status: 201, description: 'Participant added successfully' })
-  @ApiResponse({
-    status: 400,
-    description: 'Bad request - User is already a participant',
-  })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({
-    status: 403,
-    description: 'Forbidden - Only admins can add participants',
-  })
-  @ApiResponse({ status: 404, description: 'Conversation not found' })
+  @addParticipantDecorator()
   addParticipant(
     @Param('id') conversationId: string,
     @Body() body: { participantId: string },
@@ -140,17 +90,7 @@ export class ChatController {
   }
 
   @Delete('conversations/:id/participants/:participantId')
-  @ApiOperation({ summary: 'Remove participant from conversation' })
-  @ApiResponse({ status: 200, description: 'Participant removed successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({
-    status: 403,
-    description: 'Forbidden - Not authorized to remove this participant',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Conversation or participant not found',
-  })
+  @removeParticipantDecorator()
   removeParticipant(
     @Param('id') conversationId: string,
     @Param('participantId') participantId: string,
@@ -164,11 +104,7 @@ export class ChatController {
   }
 
   @Post('conversations/:id/read')
-  @ApiOperation({ summary: 'Mark conversation as read' })
-  @ApiResponse({ status: 200, description: 'Conversation marked as read' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Not a participant' })
-  @ApiResponse({ status: 404, description: 'Conversation not found' })
+  @markAsReadDecorator()
   markAsRead(@Param('id') conversationId: string, @RequestDecorator() req: any) {
     return this.chatService.markAsRead(conversationId, req.user.id);
   }

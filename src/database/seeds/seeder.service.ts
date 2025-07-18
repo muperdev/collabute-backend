@@ -78,6 +78,9 @@ export class SeederService {
     password: string;
   }) {
     this.logger.log('🌱 Creating admin user...');
+    this.logger.warn(
+      '⚠️  SECURITY WARNING: This method should only be used for initial setup. Admin users should be created through Better Auth registration.',
+    );
 
     try {
       // Get admin role
@@ -95,27 +98,17 @@ export class SeederService {
       });
 
       if (existingUser) {
-        this.logger.warn(`Admin user with email ${adminData.email} already exists`);
+        this.logger.warn(
+          `Admin user with email ${adminData.email} already exists`,
+        );
         return { success: false, message: 'Admin user already exists' };
       }
 
-      // Create admin user
-      const adminUser = await this.prisma.user.create({
-        data: {
-          email: adminData.email,
-          name: adminData.name,
-          password: adminData.password, // Should be hashed in real implementation
-          roleId: adminRole.id,
-          isVerified: true,
-          kycStatus: 'VERIFIED',
-        },
-        include: {
-          role: true,
-        },
-      });
-
-      this.logger.log(`✅ Admin user created successfully: ${adminUser.email}`);
-      return { success: true, message: 'Admin user created successfully', user: adminUser };
+      // SECURITY: This method is deprecated and should not be used in production
+      // Admin users should be created through Better Auth which handles password hashing
+      throw new Error(
+        'Creating admin users through seeder is deprecated. Use Better Auth registration instead.',
+      );
     } catch (error) {
       this.logger.error('❌ Error creating admin user:', error);
       throw error;
@@ -157,8 +150,13 @@ export class SeederService {
         },
       });
 
-      this.logger.log(`✅ Assigned default role to ${updateResult.count} users`);
-      return { success: true, message: `Assigned default role to ${updateResult.count} users` };
+      this.logger.log(
+        `✅ Assigned default role to ${updateResult.count} users`,
+      );
+      return {
+        success: true,
+        message: `Assigned default role to ${updateResult.count} users`,
+      };
     } catch (error) {
       this.logger.error('❌ Error assigning default roles:', error);
       throw error;
