@@ -4,6 +4,7 @@ import {
   IsOptional,
   IsEnum,
   IsBoolean,
+  IsNumber,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { UserType, KycStatus, PaymentMethod } from '@prisma/client';
@@ -95,6 +96,6 @@ export class CreateUserDto {
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsString()
-  roleId?: string;
+  @IsNumber()
+  roleId?: number;
 }

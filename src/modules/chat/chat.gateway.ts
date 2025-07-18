@@ -14,6 +14,7 @@ import { SendMessageDto } from './dto';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../database/prisma.service';
 import { User } from '@prisma/client';
+import { validateAndParseId } from '../../common/utils/id-validation.util';
 
 interface JwtPayload {
   sub: string;
@@ -62,8 +63,21 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
 
       const payload = this.jwtService.verify<JwtPayload>(token);
+
+      // Validate payload.sub is numeric before parsing
+      let parsedUserId: number;
+      try {
+        parsedUserId = validateAndParseId(payload.sub, 'userId');
+      } catch {
+        this.logger.warn(
+          `Invalid user ID format in JWT payload: ${payload.sub}`,
+        );
+        client.disconnect();
+        return;
+      }
+
       const user = await this.prisma.user.findUnique({
-        where: { id: payload.sub },
+        where: { id: parsedUserId },
       });
 
       if (!user) {
@@ -71,12 +85,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         return;
       }
 
-      client.userId = user.id;
+      client.userId = user.id.toString();
       client.user = user;
 
-      const userSockets = this.connectedUsers.get(user.id) || [];
+      const userSockets = this.connectedUsers.get(user.id.toString()) || [];
       userSockets.push(client.id);
-      this.connectedUsers.set(user.id, userSockets);
+      this.connectedUsers.set(user.id.toString(), userSockets);
 
       const userConversations = await this.prisma.conversation.findMany({
         where: {

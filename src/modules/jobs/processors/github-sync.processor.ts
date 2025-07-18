@@ -24,7 +24,7 @@ export class GitHubSyncProcessor {
 
     try {
       const repository = await this.prisma.gitHubRepository.findUnique({
-        where: { id: repositoryId },
+        where: { id: parseInt(repositoryId) },
         include: { project: true },
       });
 
@@ -39,7 +39,7 @@ export class GitHubSyncProcessor {
         repository.fullName,
       );
 
-      await this.updateRepositoryData(repository.id, syncData);
+      await this.updateRepositoryData(repository.id.toString(), syncData);
 
       this.logger.log(`Successfully synced repository ${repository.fullName}`);
 
@@ -61,7 +61,7 @@ export class GitHubSyncProcessor {
     const { repository } = syncData;
 
     await this.prisma.gitHubRepository.update({
-      where: { id: repositoryId },
+      where: { id: parseInt(repositoryId) },
       data: {
         description: repository.description,
         language: repository.language,

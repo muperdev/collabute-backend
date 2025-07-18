@@ -39,13 +39,14 @@ export class GitHubController {
   async getUser(@RequestDecorator() req: any) {
     const user = await this.prisma.user.findUnique({
       where: { id: req.user.id },
+      include: { githubIntegration: true }
     });
 
-    if (!user?.githubAccessToken) {
+    if (!user?.githubIntegration?.githubAccessToken) {
       throw new Error('GitHub not connected');
     }
 
-    return this.githubService.getUser(user.githubAccessToken);
+    return this.githubService.getUser(user.githubIntegration.githubAccessToken);
   }
 
   @Get('repositories')
@@ -53,15 +54,16 @@ export class GitHubController {
   async getRepositories(@RequestDecorator() req: any, @Query() query: any) {
     const user = await this.prisma.user.findUnique({
       where: { id: req.user.id },
+      include: { githubIntegration: true }
     });
 
-    if (!user?.githubAccessToken) {
+    if (!user?.githubIntegration?.githubAccessToken) {
       throw new Error('GitHub not connected');
     }
 
     const { page = 1, per_page = 30 } = query;
     return this.githubService.getUserRepositories(
-      user.githubAccessToken,
+      user.githubIntegration.githubAccessToken,
       page,
       per_page,
     );
@@ -76,14 +78,15 @@ export class GitHubController {
   ) {
     const user = await this.prisma.user.findUnique({
       where: { id: req.user.id },
+      include: { githubIntegration: true }
     });
 
-    if (!user?.githubAccessToken) {
+    if (!user?.githubIntegration?.githubAccessToken) {
       throw new Error('GitHub not connected');
     }
 
     return this.githubService.getRepository(
-      user.githubAccessToken,
+      user.githubIntegration.githubAccessToken,
       `${owner}/${repo}`,
     );
   }
@@ -98,14 +101,15 @@ export class GitHubController {
   ) {
     const user = await this.prisma.user.findUnique({
       where: { id: req.user.id },
+      include: { githubIntegration: true }
     });
 
-    if (!user?.githubAccessToken) {
+    if (!user?.githubIntegration?.githubAccessToken) {
       throw new Error('GitHub not connected');
     }
 
     return this.githubService.getRepositoryIssues(
-      user.githubAccessToken,
+      user.githubIntegration.githubAccessToken,
       `${owner}/${repo}`,
       state,
     );
@@ -121,14 +125,15 @@ export class GitHubController {
   ) {
     const user = await this.prisma.user.findUnique({
       where: { id: req.user.id },
+      include: { githubIntegration: true }
     });
 
-    if (!user?.githubAccessToken) {
+    if (!user?.githubIntegration?.githubAccessToken) {
       throw new Error('GitHub not connected');
     }
 
     return this.githubService.getRepositoryCommits(
-      user.githubAccessToken,
+      user.githubIntegration.githubAccessToken,
       `${owner}/${repo}`,
       branch,
     );
@@ -143,14 +148,15 @@ export class GitHubController {
   ) {
     const user = await this.prisma.user.findUnique({
       where: { id: req.user.id },
+      include: { githubIntegration: true }
     });
 
-    if (!user?.githubAccessToken) {
+    if (!user?.githubIntegration?.githubAccessToken) {
       throw new Error('GitHub not connected');
     }
 
     return this.githubService.getRepositoryBranches(
-      user.githubAccessToken,
+      user.githubIntegration.githubAccessToken,
       `${owner}/${repo}`,
     );
   }
@@ -171,14 +177,15 @@ export class GitHubController {
   ) {
     const user = await this.prisma.user.findUnique({
       where: { id: req.user.id },
+      include: { githubIntegration: true }
     });
 
-    if (!user?.githubAccessToken) {
+    if (!user?.githubIntegration?.githubAccessToken) {
       throw new Error('GitHub not connected');
     }
 
     return this.githubService.createIssue(
-      user.githubAccessToken,
+      user.githubIntegration.githubAccessToken,
       `${owner}/${repo}`,
       issueData,
     );
@@ -193,14 +200,15 @@ export class GitHubController {
   ) {
     const user = await this.prisma.user.findUnique({
       where: { id: req.user.id },
+      include: { githubIntegration: true }
     });
 
-    if (!user?.githubAccessToken) {
+    if (!user?.githubIntegration?.githubAccessToken) {
       throw new Error('GitHub not connected');
     }
 
     return this.githubService.syncRepositoryData(
-      user.githubAccessToken,
+      user.githubIntegration.githubAccessToken,
       `${owner}/${repo}`,
     );
   }
@@ -214,14 +222,15 @@ export class GitHubController {
   ) {
     const user = await this.prisma.user.findUnique({
       where: { id: req.user.id },
+      include: { githubIntegration: true }
     });
 
-    if (!user?.githubAccessToken) {
+    if (!user?.githubIntegration?.githubAccessToken) {
       throw new Error('GitHub not connected');
     }
 
     return this.githubService.getWebhooks(
-      user.githubAccessToken,
+      user.githubIntegration.githubAccessToken,
       `${owner}/${repo}`,
     );
   }
@@ -240,14 +249,15 @@ export class GitHubController {
   ) {
     const user = await this.prisma.user.findUnique({
       where: { id: req.user.id },
+      include: { githubIntegration: true }
     });
 
-    if (!user?.githubAccessToken) {
+    if (!user?.githubIntegration?.githubAccessToken) {
       throw new Error('GitHub not connected');
     }
 
     return this.githubService.createWebhook(
-      user.githubAccessToken,
+      user.githubIntegration.githubAccessToken,
       `${owner}/${repo}`,
       webhookData.url,
       webhookData.events,
@@ -264,14 +274,15 @@ export class GitHubController {
   ) {
     const user = await this.prisma.user.findUnique({
       where: { id: req.user.id },
+      include: { githubIntegration: true }
     });
 
-    if (!user?.githubAccessToken) {
+    if (!user?.githubIntegration?.githubAccessToken) {
       throw new Error('GitHub not connected');
     }
 
     await this.githubService.deleteWebhook(
-      user.githubAccessToken,
+      user.githubIntegration.githubAccessToken,
       `${owner}/${repo}`,
       hookId,
     );

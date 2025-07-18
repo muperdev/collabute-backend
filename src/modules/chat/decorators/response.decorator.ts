@@ -73,7 +73,10 @@ export const getMessagesDecorator = () => {
     ApiOperation({ summary: 'Get conversation messages' }),
     ApiQuery({ name: 'page', required: false, type: Number }),
     ApiQuery({ name: 'limit', required: false, type: Number }),
-    ApiResponse({ status: 200, description: 'Messages retrieved successfully' }),
+    ApiResponse({
+      status: 200,
+      description: 'Messages retrieved successfully',
+    }),
     ApiResponse({ status: 401, description: 'Unauthorized' }),
     ApiResponse({ status: 403, description: 'Forbidden - Not a participant' }),
     ApiResponse({ status: 404, description: 'Conversation not found' }),
@@ -119,7 +122,10 @@ export const removeParticipantDecorator = () => {
     UseGuards(BetterAuthGuard),
     ApiBearerAuth(),
     ApiOperation({ summary: 'Remove participant from conversation' }),
-    ApiResponse({ status: 200, description: 'Participant removed successfully' }),
+    ApiResponse({
+      status: 200,
+      description: 'Participant removed successfully',
+    }),
     ApiResponse({ status: 401, description: 'Unauthorized' }),
     ApiResponse({
       status: 403,

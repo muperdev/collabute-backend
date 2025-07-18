@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { PermissionUtil } from '../../common/utils/permission.util';
+import { validateAndParseId, validateAndParseIds } from '../../common/utils/id-validation.util';
 
 @Injectable()
 export class RolesService {
@@ -21,8 +22,10 @@ export class RolesService {
   }
 
   async findById(id: string) {
+    const parsedId = validateAndParseId(id);
+
     return this.prisma.role.findUnique({
-      where: { id },
+      where: { id: parsedId },
       include: {
         users: {
           select: {
@@ -54,8 +57,10 @@ export class RolesService {
   }
 
   async getUserPermissions(userId: string) {
+    const parsedUserId = validateAndParseId(userId, 'userId');
+
     const user = await this.prisma.user.findUnique({
-      where: { id: userId },
+      where: { id: parsedUserId },
       include: { role: true },
     });
 
@@ -67,8 +72,10 @@ export class RolesService {
   }
 
   async hasPermission(userId: string, permission: string): Promise<boolean> {
+    const parsedUserId = validateAndParseId(userId, 'userId');
+
     const user = await this.prisma.user.findUnique({
-      where: { id: userId },
+      where: { id: parsedUserId },
       include: { role: true },
     });
 
@@ -80,8 +87,10 @@ export class RolesService {
   }
 
   async isAdmin(userId: string): Promise<boolean> {
+    const parsedUserId = validateAndParseId(userId, 'userId');
+
     const user = await this.prisma.user.findUnique({
-      where: { id: userId },
+      where: { id: parsedUserId },
       include: { role: true },
     });
 
@@ -89,9 +98,14 @@ export class RolesService {
   }
 
   async assignRole(userId: string, roleId: string) {
+    const [parsedUserId, parsedRoleId] = validateAndParseIds([
+      { id: userId, fieldName: 'userId' },
+      { id: roleId, fieldName: 'roleId' },
+    ]);
+
     return this.prisma.user.update({
-      where: { id: userId },
-      data: { roleId },
+      where: { id: parsedUserId },
+      data: { roleId: parsedRoleId },
       include: { role: true },
     });
   }
@@ -102,7 +116,7 @@ export class RolesService {
       throw new Error(`Role '${roleName}' not found`);
     }
 
-    return this.assignRole(userId, role.id);
+    return this.assignRole(userId, role.id.toString());
   }
 
   async getRoleStats() {
@@ -116,7 +130,7 @@ export class RolesService {
       },
     });
 
-    return roles.map(role => ({
+    return roles.map((role) => ({
       id: role.id,
       name: role.name,
       displayName: role.displayName,

@@ -3,6 +3,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { LoginDto, RegisterDto } from './dto/auth.dto';
 import { UsersService } from '../users/users.service';
 import { auth } from '../../auth';
+import { validateAndParseId } from '../../common/utils/id-validation.util';
 
 @Injectable()
 export class AuthService {
@@ -32,7 +33,7 @@ export class AuthService {
       });
 
       const updatedUser = await this.prisma.user.update({
-        where: { id: response.user.id },
+        where: { id: validateAndParseId(response.user.id, 'User ID') },
         data: {
           profilePicture: registerDto.profilePicture,
           roleId: defaultRole?.id,
@@ -84,7 +85,9 @@ export class AuthService {
         token: response.token,
       };
     } catch (error) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException(
+        'Invalid credentials' + (error.message ? `: ${error.message}` : ''),
+      );
     }
   }
 
@@ -104,7 +107,7 @@ export class AuthService {
       });
       return { message: 'Logged out successfully' };
     } catch (error) {
-      throw new UnauthorizedException('Logout failed');
+      throw new UnauthorizedException('Logout failed', error.message);
     }
   }
 }
