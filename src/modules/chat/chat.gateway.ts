@@ -67,10 +67,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // Validate payload.sub is numeric before parsing
       let parsedUserId: number;
       try {
-        parsedUserId = validateAndParseId(
-          payload.sub,
-          'userId',
-        );
+        parsedUserId = validateAndParseId(payload.sub, 'userId');
       } catch {
         this.logger.warn(
           `Invalid user ID format in JWT payload: ${payload.sub}`,
