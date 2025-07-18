@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { PermissionUtil } from '../../common/utils/permission.util';
+import { IdValidationUtil } from '../../common/utils/id-validation.util';
 
 @Injectable()
 export class RolesService {
@@ -21,8 +22,10 @@ export class RolesService {
   }
 
   async findById(id: string) {
+    const parsedId = IdValidationUtil.validateAndParseId(id);
+
     return this.prisma.role.findUnique({
-      where: { id: parseInt(id) },
+      where: { id: parsedId },
       include: {
         users: {
           select: {
@@ -54,8 +57,10 @@ export class RolesService {
   }
 
   async getUserPermissions(userId: string) {
+    const parsedUserId = IdValidationUtil.validateAndParseId(userId, 'userId');
+
     const user = await this.prisma.user.findUnique({
-      where: { id: parseInt(userId) },
+      where: { id: parsedUserId },
       include: { role: true },
     });
 
@@ -67,8 +72,10 @@ export class RolesService {
   }
 
   async hasPermission(userId: string, permission: string): Promise<boolean> {
+    const parsedUserId = IdValidationUtil.validateAndParseId(userId, 'userId');
+
     const user = await this.prisma.user.findUnique({
-      where: { id: parseInt(userId) },
+      where: { id: parsedUserId },
       include: { role: true },
     });
 
@@ -80,8 +87,10 @@ export class RolesService {
   }
 
   async isAdmin(userId: string): Promise<boolean> {
+    const parsedUserId = IdValidationUtil.validateAndParseId(userId, 'userId');
+
     const user = await this.prisma.user.findUnique({
-      where: { id: parseInt(userId) },
+      where: { id: parsedUserId },
       include: { role: true },
     });
 
@@ -89,9 +98,14 @@ export class RolesService {
   }
 
   async assignRole(userId: string, roleId: string) {
+    const [parsedUserId, parsedRoleId] = IdValidationUtil.validateAndParseIds([
+      { id: userId, fieldName: 'userId' },
+      { id: roleId, fieldName: 'roleId' },
+    ]);
+
     return this.prisma.user.update({
-      where: { id: parseInt(userId) },
-      data: { roleId: parseInt(roleId) },
+      where: { id: parsedUserId },
+      data: { roleId: parsedRoleId },
       include: { role: true },
     });
   }
@@ -116,7 +130,7 @@ export class RolesService {
       },
     });
 
-    return roles.map(role => ({
+    return roles.map((role) => ({
       id: role.id,
       name: role.name,
       displayName: role.displayName,

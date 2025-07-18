@@ -1,6 +1,7 @@
 import { Injectable, Logger, ForbiddenException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../database/prisma.service';
+import { IdValidationUtil } from '../../common/utils/id-validation.util';
 
 export interface UploadResult {
   url: string;
@@ -41,14 +42,16 @@ export class UploadService {
     // Check if user owns this file by checking if they uploaded it
     // This would require a file tracking system in your database
     // For now, we'll implement basic validation
-    
+
     if (!userId) {
       throw new ForbiddenException('Authentication required to delete files');
     }
 
     // Note: UploadThing doesn't have a direct delete method in the server SDK
     // You would need to use the REST API or implement a webhook
-    this.logger.log(`File deletion requested for key: ${key} by user: ${userId}`);
+    this.logger.log(
+      `File deletion requested for key: ${key} by user: ${userId}`,
+    );
     // Implementation depends on your specific needs
   }
 
@@ -68,25 +71,38 @@ export class UploadService {
   async validateFileOwnership(key: string, userId: string): Promise<boolean> {
     // This would require implementing file ownership tracking in your database
     // For now, we'll implement basic validation
-    
+
     if (!userId) {
       return false;
     }
 
-    // Check if user is admin (admins can access all files)
-    const user = await this.prisma.user.findUnique({
-      where: { id: parseInt(userId) },
-      include: { role: true },
-    });
+    // Validate userId is numeric before parsing
+    try {
+      const parsedUserId = IdValidationUtil.validateAndParseId(
+        userId,
+        'userId',
+      );
 
-    if (user?.role?.name === 'admin') {
-      return true;
+      // Check if user is admin (admins can access all files)
+      const user = await this.prisma.user.findUnique({
+        where: { id: parsedUserId },
+        include: { role: true },
+      });
+
+      if (user?.role?.name === 'admin') {
+        return true;
+      }
+    } catch {
+      this.logger.warn(`Invalid userId format: ${userId}`);
+      return false;
     }
 
     // In a real implementation, you would check file ownership in database
     // For now, we'll allow access to own files only
-    this.logger.log(`File ownership validation for key: ${key} by user: ${userId}`);
-    
+    this.logger.log(
+      `File ownership validation for key: ${key} by user: ${userId}`,
+    );
+
     return true; // Placeholder - implement actual ownership check
   }
 }

@@ -28,13 +28,13 @@ export class UsersService {
       include: {
         role: true,
         developerProfile: {
-          include: { skills: true }
+          include: { skills: true },
         },
         leadProfile: {
-          include: { specializations: true, calendar: true }
+          include: { specializations: true, calendar: true },
         },
         githubIntegration: {
-          include: { githubRepositories: true }
+          include: { githubRepositories: true },
         },
       },
     });
@@ -69,13 +69,13 @@ export class UsersService {
       include: {
         role: true,
         developerProfile: {
-          include: { skills: true }
+          include: { skills: true },
         },
         leadProfile: {
-          include: { specializations: true, calendar: true }
+          include: { specializations: true, calendar: true },
         },
         githubIntegration: {
-          include: { githubRepositories: true }
+          include: { githubRepositories: true },
         },
         ownedProjects: true,
         participatingProjects: {
