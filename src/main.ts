@@ -4,7 +4,9 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    bodyParser: false, // Required for Better Auth
+  });
 
   // Global validation
   app.useGlobalPipes(
@@ -25,7 +27,7 @@ async function bootstrap() {
 A comprehensive GitHub collaboration platform API built with NestJS.
 
 ## Features
-- 🔐 **Authentication**: JWT + GitHub OAuth
+- 🔐 **Authentication**: Better Auth with Email/Password + GitHub OAuth
 - 👥 **User Management**: Complete user profiles and GitHub integration
 - 🚀 **Project Management**: Repository connection and collaboration
 - 🐛 **Issue Tracking**: Task management with collaboration features

@@ -270,6 +270,7 @@ model ProjectCollaborator {
   projectId String
   user      User               @relation(fields: [userId], references: [id])
   userId    String
+  role      CollaboratorRole   @default(MEMBER)
   status    CollaboratorStatus @default(ACTIVE)
   joinedAt  DateTime           @default(now())
 
@@ -522,6 +523,12 @@ enum MessageType {
 enum CollaboratorStatus {
   ACTIVE
   INACTIVE
+}
+
+enum CollaboratorRole {
+  MEMBER
+  TEAM_LEAD
+  ADMIN
 }
 
 enum ParticipantRole {

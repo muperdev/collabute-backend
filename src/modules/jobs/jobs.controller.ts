@@ -5,8 +5,9 @@ import {
   Body,
   Param,
   UseGuards,
-  Request,
+  Request as RequestDecorator,
 } from '@nestjs/common';
+import { Request } from 'express';
 import {
   ApiTags,
   ApiOperation,
@@ -14,22 +15,25 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { JobsService } from './jobs.service';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { BetterAuthGuard } from '../../common/guards/better-auth.guard';
+import { AdminGuard } from '../../common/guards/admin.guard';
 
 @ApiTags('jobs')
 @Controller('jobs')
-@UseGuards(JwtAuthGuard)
+@UseGuards(BetterAuthGuard)
 @ApiBearerAuth()
 export class JobsController {
   constructor(private readonly jobsService: JobsService) {}
 
   @Get('stats')
-  @ApiOperation({ summary: 'Get queue statistics' })
+  @UseGuards(AdminGuard)
+  @ApiOperation({ summary: 'Get queue statistics (Admin only)' })
   @ApiResponse({
     status: 200,
     description: 'Queue statistics retrieved successfully',
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Admin access required' })
   getQueueStats() {
     return this.jobsService.getQueueStats();
   }
@@ -38,7 +42,7 @@ export class JobsController {
   @ApiOperation({ summary: 'Send test email' })
   @ApiResponse({ status: 201, description: 'Test email queued successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async sendTestEmail(@Request() req: any) {
+  async sendTestEmail(@RequestDecorator() req: any) {
     const user = req.user;
     return this.jobsService.sendEmail({
       to: user.email,
@@ -57,7 +61,7 @@ export class JobsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async triggerGitHubSync(
     @Param('repositoryId') repositoryId: string,
-    @Request() req: any,
+    @RequestDecorator() req: any,
   ) {
     const user = req.user;
 
@@ -77,7 +81,7 @@ export class JobsController {
     description: 'Test notification queued successfully',
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async sendTestNotification(@Request() req: any) {
+  async sendTestNotification(@RequestDecorator() req: any) {
     const user = req.user;
     return this.jobsService.sendNotification({
       userId: user.id,
@@ -90,9 +94,11 @@ export class JobsController {
   }
 
   @Post('queues/:queueName/pause')
-  @ApiOperation({ summary: 'Pause a queue' })
+  @UseGuards(AdminGuard)
+  @ApiOperation({ summary: 'Pause a queue (Admin only)' })
   @ApiResponse({ status: 200, description: 'Queue paused successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Admin access required' })
   async pauseQueue(
     @Param('queueName') queueName: 'email' | 'github-sync' | 'notifications',
   ) {
@@ -101,9 +107,11 @@ export class JobsController {
   }
 
   @Post('queues/:queueName/resume')
-  @ApiOperation({ summary: 'Resume a queue' })
+  @UseGuards(AdminGuard)
+  @ApiOperation({ summary: 'Resume a queue (Admin only)' })
   @ApiResponse({ status: 200, description: 'Queue resumed successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Admin access required' })
   async resumeQueue(
     @Param('queueName') queueName: 'email' | 'github-sync' | 'notifications',
   ) {
@@ -112,9 +120,11 @@ export class JobsController {
   }
 
   @Post('queues/:queueName/clear')
-  @ApiOperation({ summary: 'Clear a queue' })
+  @UseGuards(AdminGuard)
+  @ApiOperation({ summary: 'Clear a queue (Admin only)' })
   @ApiResponse({ status: 200, description: 'Queue cleared successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Admin access required' })
   async clearQueue(
     @Param('queueName') queueName: 'email' | 'github-sync' | 'notifications',
   ) {

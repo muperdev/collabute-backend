@@ -6,9 +6,10 @@ import {
   Param,
   Query,
   UseGuards,
-  Request,
   Body,
+  Request as RequestDecorator,
 } from '@nestjs/common';
+import { Request } from 'express';
 import {
   ApiTags,
   ApiOperation,
@@ -17,12 +18,12 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { GitHubService } from './github.service';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { BetterAuthGuard } from '../../common/guards/better-auth.guard';
 import { PrismaService } from '../../database/prisma.service';
 
 @ApiTags('github')
 @Controller('github')
-@UseGuards(JwtAuthGuard)
+@UseGuards(BetterAuthGuard)
 @ApiBearerAuth()
 export class GitHubController {
   constructor(
@@ -41,7 +42,7 @@ export class GitHubController {
     description: 'GitHub not connected or API error',
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async getUser(@Request() req: any) {
+  async getUser(@RequestDecorator() req: any) {
     const user = await this.prisma.user.findUnique({
       where: { id: req.user.id },
     });
@@ -66,7 +67,7 @@ export class GitHubController {
     description: 'GitHub not connected or API error',
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async getRepositories(@Request() req: any, @Query() query: any) {
+  async getRepositories(@RequestDecorator() req: any, @Query() query: any) {
     const user = await this.prisma.user.findUnique({
       where: { id: req.user.id },
     });
@@ -96,7 +97,7 @@ export class GitHubController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Repository not found' })
   async getRepository(
-    @Request() req: any,
+    @RequestDecorator() req: any,
     @Param('owner') owner: string,
     @Param('repo') repo: string,
   ) {
@@ -127,7 +128,7 @@ export class GitHubController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getRepositoryIssues(
-    @Request() req: any,
+    @RequestDecorator() req: any,
     @Param('owner') owner: string,
     @Param('repo') repo: string,
     @Query('state') state: 'open' | 'closed' | 'all' = 'open',
@@ -160,7 +161,7 @@ export class GitHubController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getRepositoryCommits(
-    @Request() req: any,
+    @RequestDecorator() req: any,
     @Param('owner') owner: string,
     @Param('repo') repo: string,
     @Query('branch') branch?: string,
@@ -192,7 +193,7 @@ export class GitHubController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getRepositoryBranches(
-    @Request() req: any,
+    @RequestDecorator() req: any,
     @Param('owner') owner: string,
     @Param('repo') repo: string,
   ) {
@@ -219,7 +220,7 @@ export class GitHubController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async createIssue(
-    @Request() req: any,
+    @RequestDecorator() req: any,
     @Param('owner') owner: string,
     @Param('repo') repo: string,
     @Body()
@@ -257,7 +258,7 @@ export class GitHubController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async syncRepositoryData(
-    @Request() req: any,
+    @RequestDecorator() req: any,
     @Param('owner') owner: string,
     @Param('repo') repo: string,
   ) {
@@ -284,7 +285,7 @@ export class GitHubController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getWebhooks(
-    @Request() req: any,
+    @RequestDecorator() req: any,
     @Param('owner') owner: string,
     @Param('repo') repo: string,
   ) {
@@ -311,7 +312,7 @@ export class GitHubController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async createWebhook(
-    @Request() req: any,
+    @RequestDecorator() req: any,
     @Param('owner') owner: string,
     @Param('repo') repo: string,
     @Body()
@@ -345,7 +346,7 @@ export class GitHubController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async deleteWebhook(
-    @Request() req: any,
+    @RequestDecorator() req: any,
     @Param('owner') owner: string,
     @Param('repo') repo: string,
     @Param('hookId') hookId: number,

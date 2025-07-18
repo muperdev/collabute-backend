@@ -1,0 +1,127 @@
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../../database/prisma.service';
+import { PermissionUtil } from '../../common/utils/permission.util';
+
+@Injectable()
+export class RolesService {
+  constructor(private prisma: PrismaService) {}
+
+  async findAll() {
+    return this.prisma.role.findMany({
+      where: { isActive: true },
+      include: {
+        _count: {
+          select: {
+            users: true,
+          },
+        },
+      },
+      orderBy: { name: 'asc' },
+    });
+  }
+
+  async findById(id: string) {
+    return this.prisma.role.findUnique({
+      where: { id },
+      include: {
+        users: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+  }
+
+  async findByName(name: string) {
+    return this.prisma.role.findUnique({
+      where: { name },
+    });
+  }
+
+  async getDefaultRole() {
+    return this.prisma.role.findUnique({
+      where: { name: 'user' },
+    });
+  }
+
+  async getAdminRole() {
+    return this.prisma.role.findUnique({
+      where: { name: 'admin' },
+    });
+  }
+
+  async getUserPermissions(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { role: true },
+    });
+
+    if (!user?.role) {
+      return [];
+    }
+
+    return PermissionUtil.getEffectivePermissions(user.role);
+  }
+
+  async hasPermission(userId: string, permission: string): Promise<boolean> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { role: true },
+    });
+
+    if (!user?.role) {
+      return false;
+    }
+
+    return PermissionUtil.hasPermission(user.role, permission);
+  }
+
+  async isAdmin(userId: string): Promise<boolean> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { role: true },
+    });
+
+    return PermissionUtil.isAdmin(user?.role);
+  }
+
+  async assignRole(userId: string, roleId: string) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { roleId },
+      include: { role: true },
+    });
+  }
+
+  async assignRoleByName(userId: string, roleName: string) {
+    const role = await this.findByName(roleName);
+    if (!role) {
+      throw new Error(`Role '${roleName}' not found`);
+    }
+
+    return this.assignRole(userId, role.id);
+  }
+
+  async getRoleStats() {
+    const roles = await this.prisma.role.findMany({
+      include: {
+        _count: {
+          select: {
+            users: true,
+          },
+        },
+      },
+    });
+
+    return roles.map(role => ({
+      id: role.id,
+      name: role.name,
+      displayName: role.displayName,
+      userCount: role._count.users,
+      isActive: role.isActive,
+    }));
+  }
+}

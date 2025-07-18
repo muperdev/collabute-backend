@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateUserDto, UpdateUserDto } from './dto';
 
@@ -7,8 +11,20 @@ export class UsersService {
   constructor(private prisma: PrismaService) {}
 
   async create(createUserDto: CreateUserDto) {
+    // Get default user role if no role is specified
+    let roleId = createUserDto.roleId;
+    if (!roleId) {
+      const defaultRole = await this.prisma.role.findUnique({
+        where: { name: 'user' },
+      });
+      roleId = defaultRole?.id;
+    }
+
     return this.prisma.user.create({
-      data: createUserDto,
+      data: {
+        ...createUserDto,
+        roleId,
+      },
       include: {
         role: true,
         githubRepositories: true,
@@ -39,7 +55,7 @@ export class UsersService {
     });
   }
 
-  async findById(id: string) {
+  async findById(id: string, requesterId?: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
       include: {
@@ -56,6 +72,18 @@ export class UsersService {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
 
+    // Check if requester can access this user's data
+    if (requesterId && requesterId !== id) {
+      const requester = await this.prisma.user.findUnique({
+        where: { id: requesterId },
+        include: { role: true },
+      });
+
+      if (!requester?.role || requester.role.name !== 'admin') {
+        throw new ForbiddenException('You can only access your own profile');
+      }
+    }
+
     return user;
   }
 
@@ -68,8 +96,17 @@ export class UsersService {
     });
   }
 
-  async update(id: string, updateUserDto: UpdateUserDto) {
-    const user = await this.findById(id);
+  async update(id: string, updateUserDto: UpdateUserDto, requesterId?: string) {
+    if (requesterId && requesterId !== id) {
+      const requester = await this.prisma.user.findUnique({
+        where: { id: requesterId },
+        include: { role: true },
+      });
+
+      if (!requester?.role || requester.role.name !== 'admin') {
+        throw new ForbiddenException('You can only update your own profile');
+      }
+    }
 
     return this.prisma.user.update({
       where: { id },
@@ -82,14 +119,30 @@ export class UsersService {
   }
 
   async remove(id: string) {
-    const user = await this.findById(id);
-
     return this.prisma.user.delete({
       where: { id },
     });
   }
 
-  async updateGitHubData(userId: string, githubData: any) {
+  async updateGitHubData(
+    userId: string,
+    githubData: any,
+    requesterId?: string,
+  ) {
+    // Check if requester can update this user's GitHub data
+    if (requesterId && requesterId !== userId) {
+      const requester = await this.prisma.user.findUnique({
+        where: { id: requesterId },
+        include: { role: true },
+      });
+
+      if (!requester?.role || requester.role.name !== 'admin') {
+        throw new ForbiddenException(
+          'You can only update your own GitHub data',
+        );
+      }
+    }
+
     return this.prisma.user.update({
       where: { id: userId },
       data: {

@@ -8,8 +8,9 @@ import {
   Delete,
   Query,
   UseGuards,
-  Request,
+  Request as RequestDecorator,
 } from '@nestjs/common';
+import { Request } from 'express';
 import {
   ApiTags,
   ApiOperation,
@@ -19,7 +20,7 @@ import {
 } from '@nestjs/swagger';
 import { IssuesService } from './issues.service';
 import { CreateIssueDto, UpdateIssueDto } from './dto';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { BetterAuthGuard } from '../../common/guards/better-auth.guard';
 
 @ApiTags('issues')
 @Controller('issues')
@@ -27,7 +28,7 @@ export class IssuesController {
   constructor(private readonly issuesService: IssuesService) {}
 
   @Post()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(BetterAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new issue' })
   @ApiResponse({ status: 201, description: 'Issue created successfully' })
@@ -38,7 +39,7 @@ export class IssuesController {
     description: 'Forbidden - Not a project collaborator',
   })
   @ApiResponse({ status: 404, description: 'Project not found' })
-  create(@Body() createIssueDto: CreateIssueDto, @Request() req: any) {
+  create(@Body() createIssueDto: CreateIssueDto, @RequestDecorator() req: any) {
     return this.issuesService.create(createIssueDto, req.user.id);
   }
 
@@ -66,7 +67,7 @@ export class IssuesController {
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(BetterAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update issue' })
   @ApiResponse({ status: 200, description: 'Issue updated successfully' })
@@ -80,13 +81,13 @@ export class IssuesController {
   update(
     @Param('id') id: string,
     @Body() updateIssueDto: UpdateIssueDto,
-    @Request() req: any,
+    @RequestDecorator() req: any,
   ) {
     return this.issuesService.update(id, updateIssueDto, req.user.id);
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(BetterAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete issue' })
   @ApiResponse({ status: 200, description: 'Issue deleted successfully' })
@@ -96,7 +97,7 @@ export class IssuesController {
     description: 'Forbidden - Not authorized to delete this issue',
   })
   @ApiResponse({ status: 404, description: 'Issue not found' })
-  remove(@Param('id') id: string, @Request() req: any) {
+  remove(@Param('id') id: string, @RequestDecorator() req: any) {
     return this.issuesService.remove(id, req.user.id);
   }
 }

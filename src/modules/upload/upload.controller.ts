@@ -1,7 +1,7 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { UploadService } from './upload.service';
-import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+import { BetterAuthGuard } from 'src/common/guards/better-auth.guard';
 
 @ApiTags('upload')
 @Controller('upload')
@@ -9,7 +9,7 @@ export class UploadController {
   constructor(private readonly uploadService: UploadService) {}
 
   @Get('config')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(BetterAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get UploadThing configuration for frontend' })
   getUploadConfig() {

@@ -7,8 +7,9 @@ import {
   Delete,
   Query,
   UseGuards,
-  Request,
+  Request as RequestDecorator,
 } from '@nestjs/common';
+import { Request } from 'express';
 import {
   ApiTags,
   ApiOperation,
@@ -18,11 +19,11 @@ import {
 } from '@nestjs/swagger';
 import { ChatService } from './chat.service';
 import { CreateConversationDto, SendMessageDto } from './dto';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { BetterAuthGuard } from '../../common/guards/better-auth.guard';
 
 @ApiTags('chat')
 @Controller('chat')
-@UseGuards(JwtAuthGuard)
+@UseGuards(BetterAuthGuard)
 @ApiBearerAuth()
 export class ChatController {
   constructor(private readonly chatService: ChatService) {}
@@ -38,7 +39,7 @@ export class ChatController {
   @ApiResponse({ status: 403, description: 'Forbidden' })
   createConversation(
     @Body() createConversationDto: CreateConversationDto,
-    @Request() req: any,
+    @RequestDecorator() req: any,
   ) {
     return this.chatService.createConversation(
       createConversationDto,
@@ -57,7 +58,7 @@ export class ChatController {
     description: 'Conversations retrieved successfully',
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  findConversations(@Request() req: any, @Query() query: any) {
+  findConversations(@RequestDecorator() req: any, @Query() query: any) {
     return this.chatService.findConversations(req.user.id, query);
   }
 
@@ -70,7 +71,7 @@ export class ChatController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden - Not a participant' })
   @ApiResponse({ status: 404, description: 'Conversation not found' })
-  findConversation(@Param('id') id: string, @Request() req: any) {
+  findConversation(@Param('id') id: string, @RequestDecorator() req: any) {
     return this.chatService.findConversation(id, req.user.id);
   }
 
@@ -80,7 +81,7 @@ export class ChatController {
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden - Not a participant' })
-  sendMessage(@Body() sendMessageDto: SendMessageDto, @Request() req: any) {
+  sendMessage(@Body() sendMessageDto: SendMessageDto, @RequestDecorator() req: any) {
     return this.chatService.sendMessage(sendMessageDto, req.user.id);
   }
 
@@ -94,7 +95,7 @@ export class ChatController {
   @ApiResponse({ status: 404, description: 'Conversation not found' })
   getMessages(
     @Param('id') conversationId: string,
-    @Request() req: any,
+    @RequestDecorator() req: any,
     @Query() query: any,
   ) {
     return this.chatService.getMessages(conversationId, req.user.id, query);
@@ -109,7 +110,7 @@ export class ChatController {
     description: 'Forbidden - Not authorized to delete this message',
   })
   @ApiResponse({ status: 404, description: 'Message not found' })
-  deleteMessage(@Param('id') messageId: string, @Request() req: any) {
+  deleteMessage(@Param('id') messageId: string, @RequestDecorator() req: any) {
     return this.chatService.deleteMessage(messageId, req.user.id);
   }
 
@@ -129,7 +130,7 @@ export class ChatController {
   addParticipant(
     @Param('id') conversationId: string,
     @Body() body: { participantId: string },
-    @Request() req: any,
+    @RequestDecorator() req: any,
   ) {
     return this.chatService.addParticipant(
       conversationId,
@@ -153,7 +154,7 @@ export class ChatController {
   removeParticipant(
     @Param('id') conversationId: string,
     @Param('participantId') participantId: string,
-    @Request() req: any,
+    @RequestDecorator() req: any,
   ) {
     return this.chatService.removeParticipant(
       conversationId,
@@ -168,7 +169,7 @@ export class ChatController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden - Not a participant' })
   @ApiResponse({ status: 404, description: 'Conversation not found' })
-  markAsRead(@Param('id') conversationId: string, @Request() req: any) {
+  markAsRead(@Param('id') conversationId: string, @RequestDecorator() req: any) {
     return this.chatService.markAsRead(conversationId, req.user.id);
   }
 }

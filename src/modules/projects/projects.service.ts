@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { GitHubService } from '../github/github.service';
@@ -85,7 +86,7 @@ export class ProjectsService {
     });
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, userId?: string) {
     const project = await this.prisma.project.findUnique({
       where: { id },
       include: {
@@ -108,10 +109,20 @@ export class ProjectsService {
       throw new NotFoundException(`Project with ID ${id} not found`);
     }
 
+    // Check access for private projects
+    if (project.repository?.isPrivate && userId) {
+      const hasAccess = await this.checkProjectAccess(project.id, userId);
+      if (!hasAccess) {
+        throw new ForbiddenException(
+          'You do not have access to this private project',
+        );
+      }
+    }
+
     return project;
   }
 
-  async findBySlug(slug: string) {
+  async findBySlug(slug: string, userId?: string) {
     const project = await this.prisma.project.findUnique({
       where: { slug },
       include: {
@@ -133,11 +144,32 @@ export class ProjectsService {
       throw new NotFoundException(`Project with slug ${slug} not found`);
     }
 
+    // Check access for private projects
+    if (project.repository?.isPrivate && userId) {
+      const hasAccess = await this.checkProjectAccess(project.id, userId);
+      if (!hasAccess) {
+        throw new ForbiddenException(
+          'You do not have access to this private project',
+        );
+      }
+    }
+
     return project;
   }
 
-  async update(id: string, updateProjectDto: UpdateProjectDto) {
+  async update(id: string, updateProjectDto: UpdateProjectDto, userId: string) {
     const project = await this.findOne(id);
+
+    // Check if user has permission to update this project
+    const hasPermission = await this.checkProjectUpdatePermission(
+      project.id,
+      userId,
+    );
+    if (!hasPermission) {
+      throw new ForbiddenException(
+        'You do not have permission to update this project',
+      );
+    }
 
     return this.prisma.project.update({
       where: { id },
@@ -154,8 +186,22 @@ export class ProjectsService {
     });
   }
 
-  async remove(id: string) {
+  async remove(id: string, userId: string) {
     const project = await this.findOne(id);
+
+    // Only project owner or admin can delete
+    if (project.ownerId !== userId) {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        include: { role: true },
+      });
+
+      if (!user?.role || user.role.name !== 'admin') {
+        throw new ForbiddenException(
+          'Only project owner or admin can delete this project',
+        );
+      }
+    }
 
     return this.prisma.project.delete({
       where: { id },
@@ -167,6 +213,17 @@ export class ProjectsService {
     connectRepoDto: ConnectRepositoryDto,
     userId: string,
   ) {
+    // Check if user has permission to connect repository
+    const hasPermission = await this.checkProjectUpdatePermission(
+      projectId,
+      userId,
+    );
+    if (!hasPermission) {
+      throw new ForbiddenException(
+        'You do not have permission to connect repository to this project',
+      );
+    }
+
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
@@ -226,6 +283,68 @@ export class ProjectsService {
         `Failed to connect repository: ${error.message}`,
       );
     }
+  }
+
+  private async checkProjectAccess(
+    projectId: string,
+    userId: string,
+  ): Promise<boolean> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      include: {
+        collaborators: true,
+      },
+    });
+
+    if (!project) return false;
+
+    // Owner has access
+    if (project.ownerId === userId) return true;
+
+    // Check if user is a collaborator
+    const isCollaborator = project.collaborators.some(
+      (collab) => collab.userId === userId,
+    );
+    if (isCollaborator) return true;
+
+    // Check if user is admin
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { role: true },
+    });
+
+    return user?.role?.name === 'admin';
+  }
+
+  private async checkProjectUpdatePermission(
+    projectId: string,
+    userId: string,
+  ): Promise<boolean> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      include: {
+        collaborators: true,
+      },
+    });
+
+    if (!project) return false;
+
+    // Owner can update
+    if (project.ownerId === userId) return true;
+
+    // Check if user is a team lead collaborator
+    const collaborator = project.collaborators.find(
+      (collab) => collab.userId === userId,
+    );
+    if (collaborator && collaborator.role === 'TEAM_LEAD') return true;
+
+    // Check if user is admin
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { role: true },
+    });
+
+    return user?.role?.name === 'admin';
   }
 
   private generateSlug(title: string): string {
