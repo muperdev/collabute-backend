@@ -4,41 +4,35 @@ import {
   Post,
   Body,
   Param,
-  UseGuards,
-  Request,
+  Request as RequestDecorator,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-} from '@nestjs/swagger';
+import { Request } from 'express';
+import { ApiTags } from '@nestjs/swagger';
 import { JobsService } from './jobs.service';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import {
+  getQueueStatsDecorator,
+  sendTestEmailDecorator,
+  triggerGitHubSyncDecorator,
+  sendTestNotificationDecorator,
+  pauseQueueDecorator,
+  resumeQueueDecorator,
+  clearQueueDecorator,
+} from './decorators/response.decorator';
 
 @ApiTags('jobs')
 @Controller('jobs')
-@UseGuards(JwtAuthGuard)
-@ApiBearerAuth()
 export class JobsController {
   constructor(private readonly jobsService: JobsService) {}
 
   @Get('stats')
-  @ApiOperation({ summary: 'Get queue statistics' })
-  @ApiResponse({
-    status: 200,
-    description: 'Queue statistics retrieved successfully',
-  })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @getQueueStatsDecorator()
   getQueueStats() {
     return this.jobsService.getQueueStats();
   }
 
   @Post('email/test')
-  @ApiOperation({ summary: 'Send test email' })
-  @ApiResponse({ status: 201, description: 'Test email queued successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async sendTestEmail(@Request() req: any) {
+  @sendTestEmailDecorator()
+  async sendTestEmail(@RequestDecorator() req: any) {
     const user = req.user;
     return this.jobsService.sendEmail({
       to: user.email,
@@ -49,15 +43,10 @@ export class JobsController {
   }
 
   @Post('github-sync/:repositoryId')
-  @ApiOperation({ summary: 'Trigger GitHub repository sync' })
-  @ApiResponse({
-    status: 201,
-    description: 'GitHub sync job queued successfully',
-  })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @triggerGitHubSyncDecorator()
   async triggerGitHubSync(
     @Param('repositoryId') repositoryId: string,
-    @Request() req: any,
+    @RequestDecorator() req: any,
   ) {
     const user = req.user;
 
@@ -71,13 +60,8 @@ export class JobsController {
   }
 
   @Post('notifications/test')
-  @ApiOperation({ summary: 'Send test notification' })
-  @ApiResponse({
-    status: 201,
-    description: 'Test notification queued successfully',
-  })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async sendTestNotification(@Request() req: any) {
+  @sendTestNotificationDecorator()
+  async sendTestNotification(@RequestDecorator() req: any) {
     const user = req.user;
     return this.jobsService.sendNotification({
       userId: user.id,
@@ -90,9 +74,7 @@ export class JobsController {
   }
 
   @Post('queues/:queueName/pause')
-  @ApiOperation({ summary: 'Pause a queue' })
-  @ApiResponse({ status: 200, description: 'Queue paused successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @pauseQueueDecorator()
   async pauseQueue(
     @Param('queueName') queueName: 'email' | 'github-sync' | 'notifications',
   ) {
@@ -101,9 +83,7 @@ export class JobsController {
   }
 
   @Post('queues/:queueName/resume')
-  @ApiOperation({ summary: 'Resume a queue' })
-  @ApiResponse({ status: 200, description: 'Queue resumed successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @resumeQueueDecorator()
   async resumeQueue(
     @Param('queueName') queueName: 'email' | 'github-sync' | 'notifications',
   ) {
@@ -112,9 +92,7 @@ export class JobsController {
   }
 
   @Post('queues/:queueName/clear')
-  @ApiOperation({ summary: 'Clear a queue' })
-  @ApiResponse({ status: 200, description: 'Queue cleared successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @clearQueueDecorator()
   async clearQueue(
     @Param('queueName') queueName: 'email' | 'github-sync' | 'notifications',
   ) {

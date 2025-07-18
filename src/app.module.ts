@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { BullModule } from '@nestjs/bull';
+import { AuthModule as BetterAuthModule } from '@thallesp/nestjs-better-auth';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DatabaseModule } from './database/database.module';
@@ -14,6 +15,7 @@ import { JobsModule } from './modules/jobs/jobs.module';
 import { RedisModule } from './modules/redis/redis.module';
 import { UploadModule } from './modules/upload/upload.module';
 import { FrontendModule } from './modules/frontend/frontend.module';
+import { auth } from './auth';
 
 @Module({
   imports: [
@@ -28,6 +30,7 @@ import { FrontendModule } from './modules/frontend/frontend.module';
         tls: process.env.NODE_ENV === 'production' ? {} : undefined,
       },
     }),
+    BetterAuthModule.forRoot(auth),
     DatabaseModule,
     AuthModule,
     UsersModule,

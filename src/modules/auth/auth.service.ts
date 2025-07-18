@@ -1,129 +1,110 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../database/prisma.service';
 import { LoginDto, RegisterDto } from './dto/auth.dto';
 import { UsersService } from '../users/users.service';
-import * as bcrypt from 'bcrypt';
+import { auth } from '../../auth';
 
 @Injectable()
 export class AuthService {
   constructor(
     private prisma: PrismaService,
-    private jwtService: JwtService,
     private usersService: UsersService,
   ) {}
 
   async register(registerDto: RegisterDto) {
-    const hashedPassword = await bcrypt.hash(registerDto.password, 10);
+    try {
+      // Use Better Auth to create user
+      const response = await auth.api.signUpEmail({
+        body: {
+          email: registerDto.email,
+          password: registerDto.password,
+          name: registerDto.name,
+        },
+      });
 
-    const user = await this.prisma.user.create({
-      data: {
-        email: registerDto.email,
-        name: registerDto.name,
-        password: hashedPassword,
-        profilePicture: registerDto.profilePicture,
-      },
-      include: {
-        role: true,
-      },
-    });
+      if (!response.user) {
+        throw new UnauthorizedException('Registration failed');
+      }
 
-    const payload = { email: user.email, sub: user.id };
-    const accessToken = this.jwtService.sign(payload);
+      // Get default user role and update user with additional data
+      const defaultRole = await this.prisma.role.findUnique({
+        where: { name: 'user' },
+      });
 
-    return {
-      accessToken,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        type: user.type,
-        role: user.role,
-      },
-    };
+      const updatedUser = await this.prisma.user.update({
+        where: { id: response.user.id },
+        data: {
+          profilePicture: registerDto.profilePicture,
+          roleId: defaultRole?.id,
+        },
+        include: {
+          role: true,
+        },
+      });
+
+      return {
+        user: {
+          id: updatedUser.id,
+          email: updatedUser.email,
+          name: updatedUser.name,
+          type: updatedUser.type,
+          role: updatedUser.role,
+        },
+        token: response.token,
+      };
+    } catch (error) {
+      throw new UnauthorizedException(error.message || 'Registration failed');
+    }
   }
 
   async login(loginDto: LoginDto) {
-    const user = await this.usersService.findByEmail(loginDto.email);
+    try {
+      const response = await auth.api.signInEmail({
+        body: {
+          email: loginDto.email,
+          password: loginDto.password,
+        },
+      });
 
-    if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
-
-    // Validate password
-    if (user.password && loginDto.password) {
-      const isPasswordValid = await bcrypt.compare(
-        loginDto.password,
-        user.password,
-      );
-      if (!isPasswordValid) {
+      if (!response.user) {
         throw new UnauthorizedException('Invalid credentials');
       }
+
+      // Get user with role information
+      const user = await this.usersService.findById(response.user.id);
+
+      return {
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          type: user.type,
+          role: user.role,
+        },
+        token: response.token,
+      };
+    } catch (error) {
+      throw new UnauthorizedException('Invalid credentials');
     }
-
-    const payload = { email: user.email, sub: user.id };
-    const accessToken = this.jwtService.sign(payload);
-
-    return {
-      accessToken,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        type: user.type,
-        role: user.role,
-      },
-    };
   }
 
-  async githubLogin(githubUser: any) {
-    let user = await this.prisma.user.findUnique({
-      where: { githubId: githubUser.githubId },
-      include: { role: true },
-    });
+  // GitHub OAuth is now handled automatically by Better Auth
+  // Custom GitHub user processing can be done via Better Auth hooks if needed
 
-    if (!user) {
-      user = await this.prisma.user.create({
-        data: {
-          email: githubUser.email,
-          name: githubUser.name,
-          profilePicture: githubUser.profilePicture,
-          githubId: githubUser.githubId,
-          githubUsername: githubUser.githubUsername,
-          githubConnected: true,
-          githubConnectedAt: new Date(),
-          githubAccessToken: githubUser.githubAccessToken,
-        },
-        include: { role: true },
-      });
-    } else {
-      user = await this.prisma.user.update({
-        where: { id: user.id },
-        data: {
-          githubAccessToken: githubUser.githubAccessToken,
-          githubConnectedAt: new Date(),
-        },
-        include: { role: true },
-      });
-    }
-
-    const payload = { email: user.email, sub: user.id };
-    const accessToken = this.jwtService.sign(payload);
-
-    return {
-      accessToken,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        type: user.type,
-        role: user.role,
-        githubConnected: user.githubConnected,
-      },
-    };
+  async validateUser(userId: string) {
+    return await this.usersService.findById(userId);
   }
 
-  async validateUser(payload: any) {
-    return await this.usersService.findById(payload.sub);
+  async logout(sessionToken: string) {
+    try {
+      await auth.api.signOut({
+        headers: {
+          authorization: `Bearer ${sessionToken}`,
+        },
+      });
+      return { message: 'Logged out successfully' };
+    } catch (error) {
+      throw new UnauthorizedException('Logout failed');
+    }
   }
 }

@@ -34,7 +34,7 @@ apiClient.interceptors.request.use(
     }
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => Promise.reject(error),
 );
 
 // Response interceptor for error handling
@@ -47,7 +47,7 @@ apiClient.interceptors.response.use(
       window.location.href = '/login';
     }
     return Promise.reject(error);
-  }
+  },
 );
 
 export default apiClient;
@@ -65,7 +65,7 @@ class ApiClient {
   async request(endpoint, options = {}) {
     const url = `${this.baseURL}${endpoint}`;
     const token = localStorage.getItem('authToken');
-    
+
     const config = {
       headers: {
         'Content-Type': 'application/json',
@@ -75,17 +75,17 @@ class ApiClient {
     };
 
     const response = await fetch(url, config);
-    
+
     if (response.status === 401) {
       localStorage.removeItem('authToken');
       window.location.href = '/login';
       return;
     }
-    
+
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-    
+
     return response.json();
   }
 
@@ -142,11 +142,11 @@ const Login = ({ onLogin }) => {
     try {
       const response = await apiClient.post('/auth/login', credentials);
       const { access_token, user } = response.data;
-      
+
       // Store token
       localStorage.setItem('authToken', access_token);
       localStorage.setItem('user', JSON.stringify(user));
-      
+
       onLogin(user);
     } catch (error) {
       setError(error.response?.data?.message || 'Login failed');
@@ -166,33 +166,37 @@ const Login = ({ onLogin }) => {
         <input
           type="email"
           value={credentials.email}
-          onChange={(e) => setCredentials({
-            ...credentials,
-            email: e.target.value
-          })}
+          onChange={(e) =>
+            setCredentials({
+              ...credentials,
+              email: e.target.value,
+            })
+          }
           required
         />
       </div>
-      
+
       <div>
         <label>Password:</label>
         <input
           type="password"
           value={credentials.password}
-          onChange={(e) => setCredentials({
-            ...credentials,
-            password: e.target.value
-          })}
+          onChange={(e) =>
+            setCredentials({
+              ...credentials,
+              password: e.target.value,
+            })
+          }
           required
         />
       </div>
-      
+
       {error && <div className="error">{error}</div>}
-      
+
       <button type="submit" disabled={loading}>
         {loading ? 'Logging in...' : 'Login'}
       </button>
-      
+
       <button type="button" onClick={handleGitHubLogin}>
         Login with GitHub
       </button>
@@ -234,7 +238,7 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const token = localStorage.getItem('authToken');
     const user = localStorage.getItem('user');
-    
+
     if (token && user) {
       dispatch({ type: 'LOGIN', payload: JSON.parse(user) });
     }
@@ -257,12 +261,14 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{
-      ...state,
-      login,
-      logout,
-      updateUser,
-    }}>
+    <AuthContext.Provider
+      value={{
+        ...state,
+        login,
+        logout,
+        updateUser,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -332,7 +338,10 @@ export const projectService = {
   },
 
   async updateProject(projectId, projectData) {
-    const response = await apiClient.patch(`/projects/${projectId}`, projectData);
+    const response = await apiClient.patch(
+      `/projects/${projectId}`,
+      projectData,
+    );
     return response.data;
   },
 
@@ -342,7 +351,10 @@ export const projectService = {
   },
 
   async connectRepository(projectId, repoData) {
-    const response = await apiClient.post(`/projects/${projectId}/connect-repository`, repoData);
+    const response = await apiClient.post(
+      `/projects/${projectId}/connect-repository`,
+      repoData,
+    );
     return response.data;
   },
 };
@@ -399,12 +411,17 @@ export const chatService = {
   },
 
   async getConversation(conversationId) {
-    const response = await apiClient.get(`/chat/conversations/${conversationId}`);
+    const response = await apiClient.get(
+      `/chat/conversations/${conversationId}`,
+    );
     return response.data;
   },
 
   async createConversation(conversationData) {
-    const response = await apiClient.post('/chat/conversations', conversationData);
+    const response = await apiClient.post(
+      '/chat/conversations',
+      conversationData,
+    );
     return response.data;
   },
 
@@ -415,12 +432,16 @@ export const chatService = {
 
   async getMessages(conversationId, params = {}) {
     const query = new URLSearchParams(params).toString();
-    const response = await apiClient.get(`/chat/conversations/${conversationId}/messages?${query}`);
+    const response = await apiClient.get(
+      `/chat/conversations/${conversationId}/messages?${query}`,
+    );
     return response.data;
   },
 
   async markAsRead(conversationId) {
-    const response = await apiClient.post(`/chat/conversations/${conversationId}/read`);
+    const response = await apiClient.post(
+      `/chat/conversations/${conversationId}/read`,
+    );
     return response.data;
   },
 };
@@ -616,9 +637,7 @@ const Chat = ({ conversationId }) => {
       </form>
 
       {!isConnected && (
-        <div className="connection-status">
-          Disconnected from chat
-        </div>
+        <div className="connection-status">Disconnected from chat</div>
       )}
     </div>
   );
@@ -648,12 +667,16 @@ export const githubService = {
   },
 
   async getRepository(owner, repo) {
-    const response = await apiClient.get(`/github/repositories/${owner}/${repo}`);
+    const response = await apiClient.get(
+      `/github/repositories/${owner}/${repo}`,
+    );
     return response.data;
   },
 
   async getRepositoryIssues(owner, repo, state = 'open') {
-    const response = await apiClient.get(`/github/repositories/${owner}/${repo}/issues?state=${state}`);
+    const response = await apiClient.get(
+      `/github/repositories/${owner}/${repo}/issues?state=${state}`,
+    );
     return response.data;
   },
 
@@ -664,12 +687,17 @@ export const githubService = {
   },
 
   async createIssue(owner, repo, issueData) {
-    const response = await apiClient.post(`/github/repositories/${owner}/${repo}/issues`, issueData);
+    const response = await apiClient.post(
+      `/github/repositories/${owner}/${repo}/issues`,
+      issueData,
+    );
     return response.data;
   },
 
   async syncRepository(owner, repo) {
-    const response = await apiClient.get(`/github/repositories/${owner}/${repo}/sync`);
+    const response = await apiClient.get(
+      `/github/repositories/${owner}/${repo}/sync`,
+    );
     return response.data;
   },
 };
@@ -703,9 +731,7 @@ class ErrorBoundary extends React.Component {
         <div className="error-boundary">
           <h2>Something went wrong.</h2>
           <p>{this.state.error?.message}</p>
-          <button onClick={() => window.location.reload()}>
-            Reload Page
-          </button>
+          <button onClick={() => window.location.reload()}>Reload Page</button>
         </div>
       );
     }
@@ -725,14 +751,14 @@ export const handleApiError = (error) => {
   if (error.response) {
     // Server responded with error status
     const { status, data } = error.response;
-    
+
     switch (status) {
       case 400:
         return `Bad Request: ${data.message || 'Invalid request'}`;
       case 401:
         return 'Unauthorized: Please log in again';
       case 403:
-        return 'Forbidden: You don\'t have permission to perform this action';
+        return "Forbidden: You don't have permission to perform this action";
       case 404:
         return 'Not Found: The requested resource was not found';
       case 500:
@@ -782,20 +808,17 @@ export type AppDispatch = typeof store.dispatch;
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { userService } from '../../services/userService';
 
-export const loginUser = createAsyncThunk(
-  'auth/login',
-  async (credentials) => {
-    const response = await apiClient.post('/auth/login', credentials);
-    return response.data;
-  }
-);
+export const loginUser = createAsyncThunk('auth/login', async (credentials) => {
+  const response = await apiClient.post('/auth/login', credentials);
+  return response.data;
+});
 
 export const fetchUserProfile = createAsyncThunk(
   'auth/fetchProfile',
   async () => {
     const response = await userService.getProfile();
     return response;
-  }
+  },
 );
 
 const authSlice = createSlice({
@@ -903,7 +926,7 @@ describe('Login Component', () => {
 
   test('should render login form', () => {
     render(<Login onLogin={mockOnLogin} />);
-    
+
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /login/i })).toBeInTheDocument();
@@ -913,18 +936,18 @@ describe('Login Component', () => {
     const mockResponse = {
       data: {
         access_token: 'mock-token',
-        user: { id: '1', name: 'John Doe' }
-      }
+        user: { id: '1', name: 'John Doe' },
+      },
     };
     apiClient.post.mockResolvedValue(mockResponse);
 
     render(<Login onLogin={mockOnLogin} />);
-    
+
     fireEvent.change(screen.getByLabelText(/email/i), {
-      target: { value: 'test@example.com' }
+      target: { value: 'test@example.com' },
     });
     fireEvent.change(screen.getByLabelText(/password/i), {
-      target: { value: 'password' }
+      target: { value: 'password' },
     });
     fireEvent.click(screen.getByRole('button', { name: /login/i }));
 
@@ -963,7 +986,7 @@ class MobileApiClient {
 
   async request(endpoint, options = {}) {
     const token = await this.getToken();
-    
+
     const config = {
       headers: {
         'Content-Type': 'application/json',
@@ -973,11 +996,11 @@ class MobileApiClient {
     };
 
     const response = await fetch(`${this.baseURL}${endpoint}`, config);
-    
+
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-    
+
     return response.json();
   }
 }
@@ -1013,7 +1036,8 @@ const cache = new Map();
 
 export const getCachedData = (key) => {
   const cached = cache.get(key);
-  if (cached && Date.now() - cached.timestamp < 300000) { // 5 minutes
+  if (cached && Date.now() - cached.timestamp < 300000) {
+    // 5 minutes
     return cached.data;
   }
   return null;
@@ -1095,7 +1119,7 @@ export const tokenManager = {
 // utils/sanitizer.js
 export const sanitizeInput = (input) => {
   if (typeof input !== 'string') return input;
-  
+
   return input
     .replace(/[<>]/g, '') // Remove potential HTML tags
     .trim();
@@ -1132,6 +1156,7 @@ For more detailed examples and advanced patterns, refer to the [API Documentatio
 ## 📞 Support
 
 If you need help with frontend integration:
+
 - Check the [API Documentation](http://localhost:3000/api)
 - Review the [GitHub Issues](https://github.com/collabute/api/issues)
 - Contact support at support@collabute.com
