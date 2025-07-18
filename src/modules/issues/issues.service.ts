@@ -13,7 +13,7 @@ export class IssuesService {
 
   async create(createIssueDto: CreateIssueDto, userId: string) {
     const project = await this.prisma.project.findUnique({
-      where: { id: createIssueDto.projectId },
+      where: { id: parseInt(createIssueDto.projectId) },
       include: { collaborators: true },
     });
 
@@ -22,8 +22,8 @@ export class IssuesService {
     }
 
     const isCollaborator =
-      project.ownerId === userId ||
-      project.collaborators.some((collab) => collab.userId === userId);
+      project.ownerId === parseInt(userId) ||
+      project.collaborators.some((collab) => collab.userId === parseInt(userId));
 
     if (!isCollaborator) {
       throw new ForbiddenException(
@@ -33,7 +33,7 @@ export class IssuesService {
 
     if (createIssueDto.assigneeIds?.length) {
       const assignees = await this.prisma.user.findMany({
-        where: { id: { in: createIssueDto.assigneeIds } },
+        where: { id: { in: createIssueDto.assigneeIds.map(id => parseInt(id)) } },
       });
 
       if (assignees.length !== createIssueDto.assigneeIds.length) {
@@ -53,13 +53,13 @@ export class IssuesService {
         category: createIssueDto.category || [],
         priority: createIssueDto.priority,
         status: createIssueDto.status || 'OPEN',
-        projectId: createIssueDto.projectId,
-        reporterId: userId,
+        projectId: parseInt(createIssueDto.projectId),
+        reporterId: parseInt(userId),
         budget: createIssueDto.budget,
         labels: createIssueDto.labels || [],
         assignees: createIssueDto.assigneeIds
           ? {
-              connect: createIssueDto.assigneeIds.map((id) => ({ id })),
+              connect: createIssueDto.assigneeIds.map((id) => ({ id: parseInt(id) })),
             }
           : undefined,
       },
@@ -116,7 +116,7 @@ export class IssuesService {
 
   async findOne(id: string) {
     const issue = await this.prisma.issue.findUnique({
-      where: { id },
+      where: { id: parseInt(id) },
       include: {
         reporter: true,
         assignees: true,
@@ -142,10 +142,10 @@ export class IssuesService {
     const issue = await this.findOne(id);
 
     const isAuthorized =
-      issue.reporterId === userId ||
-      issue.project.ownerId === userId ||
-      issue.project.collaborators.some((collab) => collab.userId === userId) ||
-      issue.assignees.some((assignee) => assignee.id === userId);
+      issue.reporterId === parseInt(userId) ||
+      issue.project.ownerId === parseInt(userId) ||
+      issue.project.collaborators.some((collab) => collab.userId === parseInt(userId)) ||
+      issue.assignees.some((assignee) => assignee.id === parseInt(userId));
 
     if (!isAuthorized) {
       throw new ForbiddenException(
@@ -155,7 +155,7 @@ export class IssuesService {
 
     if (updateIssueDto.assigneeIds?.length) {
       const assignees = await this.prisma.user.findMany({
-        where: { id: { in: updateIssueDto.assigneeIds } },
+        where: { id: { in: updateIssueDto.assigneeIds.map(id => parseInt(id)) } },
       });
 
       if (assignees.length !== updateIssueDto.assigneeIds.length) {
@@ -184,12 +184,12 @@ export class IssuesService {
     if (updateIssueDto.assigneeIds) {
       updateData.assignees = {
         set: [],
-        connect: updateIssueDto.assigneeIds.map((id) => ({ id })),
+        connect: updateIssueDto.assigneeIds.map((id) => ({ id: parseInt(id) })),
       };
     }
 
     const updatedIssue = await this.prisma.issue.update({
-      where: { id },
+      where: { id: parseInt(id) },
       data: updateData,
       include: {
         reporter: true,
@@ -205,7 +205,7 @@ export class IssuesService {
     const issue = await this.findOne(id);
 
     const isAuthorized =
-      issue.reporterId === userId || issue.project.ownerId === userId;
+      issue.reporterId === parseInt(userId) || issue.project.ownerId === parseInt(userId);
 
     if (!isAuthorized) {
       throw new ForbiddenException(
@@ -214,7 +214,7 @@ export class IssuesService {
     }
 
     return this.prisma.issue.delete({
-      where: { id },
+      where: { id: parseInt(id) },
     });
   }
 }

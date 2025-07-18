@@ -22,7 +22,7 @@ export class RolesService {
 
   async findById(id: string) {
     return this.prisma.role.findUnique({
-      where: { id },
+      where: { id: parseInt(id) },
       include: {
         users: {
           select: {
@@ -55,7 +55,7 @@ export class RolesService {
 
   async getUserPermissions(userId: string) {
     const user = await this.prisma.user.findUnique({
-      where: { id: userId },
+      where: { id: parseInt(userId) },
       include: { role: true },
     });
 
@@ -68,7 +68,7 @@ export class RolesService {
 
   async hasPermission(userId: string, permission: string): Promise<boolean> {
     const user = await this.prisma.user.findUnique({
-      where: { id: userId },
+      where: { id: parseInt(userId) },
       include: { role: true },
     });
 
@@ -81,7 +81,7 @@ export class RolesService {
 
   async isAdmin(userId: string): Promise<boolean> {
     const user = await this.prisma.user.findUnique({
-      where: { id: userId },
+      where: { id: parseInt(userId) },
       include: { role: true },
     });
 
@@ -90,8 +90,8 @@ export class RolesService {
 
   async assignRole(userId: string, roleId: string) {
     return this.prisma.user.update({
-      where: { id: userId },
-      data: { roleId },
+      where: { id: parseInt(userId) },
+      data: { roleId: parseInt(roleId) },
       include: { role: true },
     });
   }
@@ -102,7 +102,7 @@ export class RolesService {
       throw new Error(`Role '${roleName}' not found`);
     }
 
-    return this.assignRole(userId, role.id);
+    return this.assignRole(userId, role.id.toString());
   }
 
   async getRoleStats() {

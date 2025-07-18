@@ -26,7 +26,7 @@ export class ChatService {
 
     if (createConversationDto.projectId) {
       const project = await this.prisma.project.findUnique({
-        where: { id: createConversationDto.projectId },
+        where: { id: parseInt(createConversationDto.projectId) },
         include: { collaborators: true },
       });
 
@@ -35,8 +35,8 @@ export class ChatService {
       }
 
       const isCollaborator =
-        project.ownerId === userId ||
-        project.collaborators.some((collab) => collab.userId === userId);
+        project.ownerId === parseInt(userId) ||
+        project.collaborators.some((collab) => collab.userId === parseInt(userId));
 
       if (!isCollaborator) {
         throw new ForbiddenException(
@@ -49,17 +49,17 @@ export class ChatService {
       data: {
         title: createConversationDto.title,
         type: createConversationDto.type,
-        projectId: createConversationDto.projectId,
-        createdById: userId,
+        projectId: createConversationDto.projectId ? parseInt(createConversationDto.projectId) : null,
+        createdById: parseInt(userId),
         participants: {
           create: [
             {
-              userId,
+              userId: parseInt(userId),
               role: 'ADMIN',
             },
             ...(createConversationDto.participantIds || []).map(
               (participantId) => ({
-                userId: participantId,
+                userId: parseInt(participantId),
                 role: 'MEMBER' as const,
               }),
             ),
@@ -92,10 +92,10 @@ export class ChatService {
     return this.prisma.conversation.findMany({
       where: {
         participants: {
-          some: { userId },
+          some: { userId: parseInt(userId) },
         },
         ...(type && { type }),
-        ...(projectId && { projectId }),
+        ...(projectId && { projectId: parseInt(projectId) }),
       },
       include: {
         participants: {
@@ -124,7 +124,7 @@ export class ChatService {
 
   async findConversation(conversationId: string, userId: string) {
     const conversation = await this.prisma.conversation.findUnique({
-      where: { id: conversationId },
+      where: { id: parseInt(conversationId) },
       include: {
         participants: {
           include: { user: true },
@@ -139,7 +139,7 @@ export class ChatService {
     }
 
     const isParticipant = conversation.participants.some(
-      (p) => p.userId === userId,
+      (p) => p.userId === parseInt(userId),
     );
     if (!isParticipant) {
       throw new ForbiddenException(
@@ -153,12 +153,12 @@ export class ChatService {
   async sendMessage(sendMessageDto: SendMessageDto, userId: string) {
     if (sendMessageDto.replyToId) {
       const replyTo = await this.prisma.message.findUnique({
-        where: { id: sendMessageDto.replyToId },
+        where: { id: parseInt(sendMessageDto.replyToId) },
       });
 
       if (
         !replyTo ||
-        replyTo.conversationId !== sendMessageDto.conversationId
+        replyTo.conversationId !== parseInt(sendMessageDto.conversationId)
       ) {
         throw new BadRequestException('Invalid reply-to message');
       }
@@ -167,9 +167,9 @@ export class ChatService {
     const message = await this.prisma.message.create({
       data: {
         content: sendMessageDto.content,
-        conversationId: sendMessageDto.conversationId,
-        senderId: userId,
-        replyToId: sendMessageDto.replyToId,
+        conversationId: parseInt(sendMessageDto.conversationId),
+        senderId: parseInt(userId),
+        replyToId: sendMessageDto.replyToId ? parseInt(sendMessageDto.replyToId) : null,
       },
       include: {
         sender: true,
@@ -182,7 +182,7 @@ export class ChatService {
     });
 
     await this.prisma.conversation.update({
-      where: { id: sendMessageDto.conversationId },
+      where: { id: parseInt(sendMessageDto.conversationId) },
       data: { updatedAt: new Date() },
     });
 
@@ -199,7 +199,7 @@ export class ChatService {
     const { page = 1, limit = 50 } = query;
 
     return this.prisma.message.findMany({
-      where: { conversationId },
+      where: { conversationId: parseInt(conversationId) },
       include: {
         sender: true,
         replyTo: {
@@ -216,7 +216,7 @@ export class ChatService {
 
   async deleteMessage(messageId: string, userId: string) {
     const message = await this.prisma.message.findUnique({
-      where: { id: messageId },
+      where: { id: parseInt(messageId) },
       include: {
         conversation: {
           include: {
@@ -231,9 +231,9 @@ export class ChatService {
     }
 
     const isAuthorized =
-      message.senderId === userId ||
+      message.senderId === parseInt(userId) ||
       message.conversation.participants.some(
-        (p) => p.userId === userId && p.role === 'ADMIN',
+        (p) => p.userId === parseInt(userId) && p.role === 'ADMIN',
       );
 
     if (!isAuthorized) {
@@ -243,7 +243,7 @@ export class ChatService {
     }
 
     return this.prisma.message.delete({
-      where: { id: messageId },
+      where: { id: parseInt(messageId) },
     });
   }
 
@@ -253,7 +253,7 @@ export class ChatService {
     userId: string,
   ) {
     const conversation = await this.prisma.conversation.findUnique({
-      where: { id: conversationId },
+      where: { id: parseInt(conversationId) },
       include: {
         participants: true,
       },
@@ -264,14 +264,14 @@ export class ChatService {
     }
 
     const userParticipant = conversation.participants.find(
-      (p) => p.userId === userId,
+      (p) => p.userId === parseInt(userId),
     );
     if (!userParticipant || userParticipant.role !== 'ADMIN') {
       throw new ForbiddenException('Only admins can add participants');
     }
 
     const existingParticipant = conversation.participants.find(
-      (p) => p.userId === participantId,
+      (p) => p.userId === parseInt(participantId),
     );
     if (existingParticipant) {
       throw new BadRequestException('User is already a participant');
@@ -279,8 +279,8 @@ export class ChatService {
 
     const participant = await this.prisma.conversationParticipant.create({
       data: {
-        conversationId,
-        userId: participantId,
+        conversationId: parseInt(conversationId),
+        userId: parseInt(participantId),
         role: 'MEMBER',
       },
       include: {
@@ -297,7 +297,7 @@ export class ChatService {
     userId: string,
   ) {
     const conversation = await this.prisma.conversation.findUnique({
-      where: { id: conversationId },
+      where: { id: parseInt(conversationId) },
       include: {
         participants: true,
       },
@@ -308,10 +308,10 @@ export class ChatService {
     }
 
     const userParticipant = conversation.participants.find(
-      (p) => p.userId === userId,
+      (p) => p.userId === parseInt(userId),
     );
     const targetParticipant = conversation.participants.find(
-      (p) => p.userId === participantId,
+      (p) => p.userId === parseInt(participantId),
     );
 
     if (!targetParticipant) {
@@ -329,8 +329,8 @@ export class ChatService {
     await this.prisma.conversationParticipant.delete({
       where: {
         conversationId_userId: {
-          conversationId,
-          userId: participantId,
+          conversationId: parseInt(conversationId),
+          userId: parseInt(participantId),
         },
       },
     });
@@ -343,7 +343,7 @@ export class ChatService {
 
     // Get the latest message in the conversation
     const latestMessage = await this.prisma.message.findFirst({
-      where: { conversationId },
+      where: { conversationId: parseInt(conversationId) },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -351,8 +351,8 @@ export class ChatService {
       await this.prisma.conversationParticipant.update({
         where: {
           conversationId_userId: {
-            conversationId,
-            userId,
+            conversationId: parseInt(conversationId),
+            userId: parseInt(userId),
           },
         },
         data: {

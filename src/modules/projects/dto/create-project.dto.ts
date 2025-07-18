@@ -75,6 +75,6 @@ export class CreateProjectDto {
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsString()
-  productId?: string;
+  @IsNumber()
+  productId?: number;
 }

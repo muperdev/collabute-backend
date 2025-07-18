@@ -27,7 +27,15 @@ export class UsersService {
       },
       include: {
         role: true,
-        githubRepositories: true,
+        developerProfile: {
+          include: { skills: true }
+        },
+        leadProfile: {
+          include: { specializations: true, calendar: true }
+        },
+        githubIntegration: {
+          include: { githubRepositories: true }
+        },
       },
     });
   }
@@ -57,10 +65,18 @@ export class UsersService {
 
   async findById(id: string, requesterId?: string) {
     const user = await this.prisma.user.findUnique({
-      where: { id },
+      where: { id: parseInt(id) },
       include: {
         role: true,
-        githubRepositories: true,
+        developerProfile: {
+          include: { skills: true }
+        },
+        leadProfile: {
+          include: { specializations: true, calendar: true }
+        },
+        githubIntegration: {
+          include: { githubRepositories: true }
+        },
         ownedProjects: true,
         participatingProjects: {
           include: { project: true },
@@ -75,7 +91,7 @@ export class UsersService {
     // Check if requester can access this user's data
     if (requesterId && requesterId !== id) {
       const requester = await this.prisma.user.findUnique({
-        where: { id: requesterId },
+        where: { id: parseInt(requesterId) },
         include: { role: true },
       });
 
@@ -99,7 +115,7 @@ export class UsersService {
   async update(id: string, updateUserDto: UpdateUserDto, requesterId?: string) {
     if (requesterId && requesterId !== id) {
       const requester = await this.prisma.user.findUnique({
-        where: { id: requesterId },
+        where: { id: parseInt(requesterId) },
         include: { role: true },
       });
 
@@ -109,18 +125,18 @@ export class UsersService {
     }
 
     return this.prisma.user.update({
-      where: { id },
+      where: { id: parseInt(id) },
       data: updateUserDto,
       include: {
         role: true,
-        githubRepositories: true,
+        githubIntegration: true,
       },
     });
   }
 
   async remove(id: string) {
     return this.prisma.user.delete({
-      where: { id },
+      where: { id: parseInt(id) },
     });
   }
 
@@ -132,7 +148,7 @@ export class UsersService {
     // Check if requester can update this user's GitHub data
     if (requesterId && requesterId !== userId) {
       const requester = await this.prisma.user.findUnique({
-        where: { id: requesterId },
+        where: { id: parseInt(requesterId) },
         include: { role: true },
       });
 
@@ -144,41 +160,44 @@ export class UsersService {
     }
 
     return this.prisma.user.update({
-      where: { id: userId },
+      where: { id: parseInt(userId) },
       data: {
-        githubId: githubData.id?.toString(),
-        githubUsername: githubData.login,
-        githubConnected: true,
-        githubConnectedAt: new Date(),
-        githubRepositories: {
-          upsert:
-            githubData.repositories?.map((repo: any) => ({
-              where: { repoId: repo.id.toString() },
-              update: {
-                name: repo.name,
-                fullName: repo.full_name,
-                url: repo.html_url,
-                isPrivate: repo.private,
-                description: repo.description,
-                language: repo.language,
-                defaultBranch: repo.default_branch,
-                updatedAt: new Date(repo.updated_at),
-                pushedAt: new Date(repo.pushed_at),
+        githubIntegration: {
+          upsert: {
+            where: { userId: parseInt(userId) },
+            update: {
+              githubId: githubData.id?.toString(),
+              githubUsername: githubData.login,
+              githubConnected: true,
+              githubConnectedAt: new Date(),
+              githubRepositories: {
+                upsert:
+                  githubData.repositories?.map((repo: any) => ({
+                    where: { repoId: repo.id.toString() },
+                    update: {
+                      name: repo.name,
+                    },
+                    create: {
+                      repoId: repo.id.toString(),
+                      name: repo.name,
+                    },
+                  })) || [],
               },
-              create: {
-                repoId: repo.id.toString(),
-                name: repo.name,
-                fullName: repo.full_name,
-                url: repo.html_url,
-                isPrivate: repo.private,
-                description: repo.description,
-                language: repo.language,
-                defaultBranch: repo.default_branch,
-                createdAt: new Date(repo.created_at),
-                updatedAt: new Date(repo.updated_at),
-                pushedAt: new Date(repo.pushed_at),
+            },
+            create: {
+              githubId: githubData.id?.toString(),
+              githubUsername: githubData.login,
+              githubConnected: true,
+              githubConnectedAt: new Date(),
+              githubRepositories: {
+                create:
+                  githubData.repositories?.map((repo: any) => ({
+                    repoId: repo.id.toString(),
+                    name: repo.name,
+                  })) || [],
               },
-            })) || [],
+            },
+          },
         },
       },
     });

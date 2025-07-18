@@ -23,7 +23,7 @@ export class ProjectsService {
     const project = await this.prisma.project.create({
       data: {
         ...createProjectDto,
-        ownerId: userId,
+        ownerId: parseInt(userId),
         slug: this.generateSlug(createProjectDto.title),
         milestones: {
           ideaRefinement: 'not-started',
@@ -48,10 +48,10 @@ export class ProjectsService {
         title: `${project.title} Discussion`,
         type: 'PROJECT',
         projectId: project.id,
-        createdById: userId,
+        createdById: parseInt(userId),
         participants: {
           create: {
-            userId,
+            userId: parseInt(userId),
             role: 'ADMIN',
           },
         },
@@ -88,7 +88,7 @@ export class ProjectsService {
 
   async findOne(id: string, userId?: string) {
     const project = await this.prisma.project.findUnique({
-      where: { id },
+      where: { id: parseInt(id) },
       include: {
         owner: true,
         repository: true,
@@ -111,7 +111,7 @@ export class ProjectsService {
 
     // Check access for private projects
     if (project.repository?.isPrivate && userId) {
-      const hasAccess = await this.checkProjectAccess(project.id, userId);
+      const hasAccess = await this.checkProjectAccess(project.id.toString(), userId);
       if (!hasAccess) {
         throw new ForbiddenException(
           'You do not have access to this private project',
@@ -146,7 +146,7 @@ export class ProjectsService {
 
     // Check access for private projects
     if (project.repository?.isPrivate && userId) {
-      const hasAccess = await this.checkProjectAccess(project.id, userId);
+      const hasAccess = await this.checkProjectAccess(project.id.toString(), userId);
       if (!hasAccess) {
         throw new ForbiddenException(
           'You do not have access to this private project',
@@ -162,7 +162,7 @@ export class ProjectsService {
 
     // Check if user has permission to update this project
     const hasPermission = await this.checkProjectUpdatePermission(
-      project.id,
+      project.id.toString(),
       userId,
     );
     if (!hasPermission) {
@@ -172,7 +172,7 @@ export class ProjectsService {
     }
 
     return this.prisma.project.update({
-      where: { id },
+      where: { id: parseInt(id) },
       data: {
         ...updateProjectDto,
         ...(updateProjectDto.title && {
@@ -190,9 +190,9 @@ export class ProjectsService {
     const project = await this.findOne(id);
 
     // Only project owner or admin can delete
-    if (project.ownerId !== userId) {
+    if (project.ownerId !== parseInt(userId)) {
       const user = await this.prisma.user.findUnique({
-        where: { id: userId },
+        where: { id: parseInt(userId) },
         include: { role: true },
       });
 
@@ -204,7 +204,7 @@ export class ProjectsService {
     }
 
     return this.prisma.project.delete({
-      where: { id },
+      where: { id: parseInt(id) },
     });
   }
 
@@ -225,10 +225,11 @@ export class ProjectsService {
     }
 
     const user = await this.prisma.user.findUnique({
-      where: { id: userId },
+      where: { id: parseInt(userId) },
+      include: { githubIntegration: true },
     });
 
-    if (!user?.githubAccessToken) {
+    if (!user?.githubIntegration?.githubAccessToken) {
       throw new BadRequestException(
         'GitHub not connected. Please connect your GitHub account first.',
       );
@@ -236,16 +237,16 @@ export class ProjectsService {
 
     try {
       const repoData = await this.githubService.getRepository(
-        user.githubAccessToken,
+        user.githubIntegration.githubAccessToken,
         connectRepoDto.repoFullName,
       );
 
       return this.prisma.project.update({
-        where: { id: projectId },
+        where: { id: parseInt(projectId) },
         data: {
           repository: {
             upsert: {
-              where: { projectId },
+              where: { projectId: parseInt(projectId) },
               update: {
                 repoId: repoData.id.toString(),
                 name: repoData.name,
@@ -290,7 +291,7 @@ export class ProjectsService {
     userId: string,
   ): Promise<boolean> {
     const project = await this.prisma.project.findUnique({
-      where: { id: projectId },
+      where: { id: parseInt(projectId) },
       include: {
         collaborators: true,
       },
@@ -299,17 +300,17 @@ export class ProjectsService {
     if (!project) return false;
 
     // Owner has access
-    if (project.ownerId === userId) return true;
+    if (project.ownerId === parseInt(userId)) return true;
 
     // Check if user is a collaborator
     const isCollaborator = project.collaborators.some(
-      (collab) => collab.userId === userId,
+      (collab) => collab.userId === parseInt(userId),
     );
     if (isCollaborator) return true;
 
     // Check if user is admin
     const user = await this.prisma.user.findUnique({
-      where: { id: userId },
+      where: { id: parseInt(userId) },
       include: { role: true },
     });
 
@@ -321,7 +322,7 @@ export class ProjectsService {
     userId: string,
   ): Promise<boolean> {
     const project = await this.prisma.project.findUnique({
-      where: { id: projectId },
+      where: { id: parseInt(projectId) },
       include: {
         collaborators: true,
       },
@@ -330,17 +331,17 @@ export class ProjectsService {
     if (!project) return false;
 
     // Owner can update
-    if (project.ownerId === userId) return true;
+    if (project.ownerId === parseInt(userId)) return true;
 
     // Check if user is a team lead collaborator
     const collaborator = project.collaborators.find(
-      (collab) => collab.userId === userId,
+      (collab) => collab.userId === parseInt(userId),
     );
-    if (collaborator && collaborator.role === 'TEAM_LEAD') return true;
+    if (collaborator) return true;
 
     // Check if user is admin
     const user = await this.prisma.user.findUnique({
-      where: { id: userId },
+      where: { id: parseInt(userId) },
       include: { role: true },
     });
 

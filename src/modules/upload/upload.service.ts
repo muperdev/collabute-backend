@@ -75,7 +75,7 @@ export class UploadService {
 
     // Check if user is admin (admins can access all files)
     const user = await this.prisma.user.findUnique({
-      where: { id: userId },
+      where: { id: parseInt(userId) },
       include: { role: true },
     });
 

@@ -32,7 +32,7 @@ export class AuthService {
       });
 
       const updatedUser = await this.prisma.user.update({
-        where: { id: response.user.id },
+        where: { id: parseInt(response.user.id) },
         data: {
           profilePicture: registerDto.profilePicture,
           roleId: defaultRole?.id,
@@ -84,7 +84,9 @@ export class AuthService {
         token: response.token,
       };
     } catch (error) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException(
+        'Invalid credentials' + (error.message ? `: ${error.message}` : ''),
+      );
     }
   }
 
@@ -104,7 +106,7 @@ export class AuthService {
       });
       return { message: 'Logged out successfully' };
     } catch (error) {
-      throw new UnauthorizedException('Logout failed');
+      throw new UnauthorizedException('Logout failed', error.message);
     }
   }
 }

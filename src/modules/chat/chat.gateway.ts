@@ -63,7 +63,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       const payload = this.jwtService.verify<JwtPayload>(token);
       const user = await this.prisma.user.findUnique({
-        where: { id: payload.sub },
+        where: { id: parseInt(payload.sub) },
       });
 
       if (!user) {
@@ -71,12 +71,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         return;
       }
 
-      client.userId = user.id;
+      client.userId = user.id.toString();
       client.user = user;
 
-      const userSockets = this.connectedUsers.get(user.id) || [];
+      const userSockets = this.connectedUsers.get(user.id.toString()) || [];
       userSockets.push(client.id);
-      this.connectedUsers.set(user.id, userSockets);
+      this.connectedUsers.set(user.id.toString(), userSockets);
 
       const userConversations = await this.prisma.conversation.findMany({
         where: {
