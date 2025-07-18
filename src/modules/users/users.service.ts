@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateUserDto, UpdateUserDto } from './dto';
+import { validateAndParseId } from '../../common/utils/id-validation.util';
 
 @Injectable()
 export class UsersService {
@@ -65,7 +66,7 @@ export class UsersService {
 
   async findById(id: string, requesterId?: string) {
     const user = await this.prisma.user.findUnique({
-      where: { id: parseInt(id) },
+      where: { id: validateAndParseId(id, 'User ID') },
       include: {
         role: true,
         developerProfile: {
@@ -91,7 +92,7 @@ export class UsersService {
     // Check if requester can access this user's data
     if (requesterId && requesterId !== id) {
       const requester = await this.prisma.user.findUnique({
-        where: { id: parseInt(requesterId) },
+        where: { id: validateAndParseId(requesterId, 'Requester ID') },
         include: { role: true },
       });
 
@@ -115,7 +116,7 @@ export class UsersService {
   async update(id: string, updateUserDto: UpdateUserDto, requesterId?: string) {
     if (requesterId && requesterId !== id) {
       const requester = await this.prisma.user.findUnique({
-        where: { id: parseInt(requesterId) },
+        where: { id: validateAndParseId(requesterId, 'Requester ID') },
         include: { role: true },
       });
 
@@ -125,7 +126,7 @@ export class UsersService {
     }
 
     return this.prisma.user.update({
-      where: { id: parseInt(id) },
+      where: { id: validateAndParseId(id, 'User ID') },
       data: updateUserDto,
       include: {
         role: true,
@@ -136,7 +137,7 @@ export class UsersService {
 
   async remove(id: string) {
     return this.prisma.user.delete({
-      where: { id: parseInt(id) },
+      where: { id: validateAndParseId(id, 'User ID') },
     });
   }
 
@@ -148,7 +149,7 @@ export class UsersService {
     // Check if requester can update this user's GitHub data
     if (requesterId && requesterId !== userId) {
       const requester = await this.prisma.user.findUnique({
-        where: { id: parseInt(requesterId) },
+        where: { id: validateAndParseId(requesterId, 'Requester ID') },
         include: { role: true },
       });
 
@@ -160,11 +161,11 @@ export class UsersService {
     }
 
     return this.prisma.user.update({
-      where: { id: parseInt(userId) },
+      where: { id: validateAndParseId(userId, 'User ID') },
       data: {
         githubIntegration: {
           upsert: {
-            where: { userId: parseInt(userId) },
+            where: { userId: validateAndParseId(userId, 'User ID') },
             update: {
               githubId: githubData.id?.toString(),
               githubUsername: githubData.login,

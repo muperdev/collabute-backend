@@ -1,7 +1,7 @@
 import { Injectable, Logger, ForbiddenException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../database/prisma.service';
-import { IdValidationUtil } from '../../common/utils/id-validation.util';
+import { validateAndParseId } from '../../common/utils/id-validation.util';
 
 export interface UploadResult {
   url: string;
@@ -78,7 +78,7 @@ export class UploadService {
 
     // Validate userId is numeric before parsing
     try {
-      const parsedUserId = IdValidationUtil.validateAndParseId(
+      const parsedUserId = validateAndParseId(
         userId,
         'userId',
       );

@@ -14,7 +14,7 @@ import { SendMessageDto } from './dto';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../database/prisma.service';
 import { User } from '@prisma/client';
-import { IdValidationUtil } from '../../common/utils/id-validation.util';
+import { validateAndParseId } from '../../common/utils/id-validation.util';
 
 interface JwtPayload {
   sub: string;
@@ -67,7 +67,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // Validate payload.sub is numeric before parsing
       let parsedUserId: number;
       try {
-        parsedUserId = IdValidationUtil.validateAndParseId(
+        parsedUserId = validateAndParseId(
           payload.sub,
           'userId',
         );
