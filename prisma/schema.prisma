@@ -1,3 +1,4 @@
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -45,6 +46,11 @@ model User {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  emailVerified Boolean
+  image         String?
+  sessions      Session[]
+  accounts      Account[]
 
   @@map("users")
 }
@@ -422,6 +428,7 @@ model Payment {
 }
 
 // Enums
+
 enum UserType {
   DEVELOPER
   STARTUP
@@ -585,61 +592,46 @@ enum TransactionStatus {
   FAILED
 }
 
-// Better Auth Required Models
-model BetterAuthUser {
-  id String @id
-  name String
-  email String @unique
-  emailVerified Boolean @default(false)
-  image String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  sessions BetterAuthSession[]
-  accounts BetterAuthAccount[]
-  
-  @@map("user")
-}
-
-model BetterAuthSession {
-  id String @id
+model Session {
+  id        String   @id
   expiresAt DateTime
-  token String @unique
+  token     String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   ipAddress String?
   userAgent String?
-  userId String
-  user BetterAuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@map("session")
 }
 
-model BetterAuthAccount {
-  id String @id
-  accountId String
-  providerId String
-  userId String
-  user BetterAuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
-  accessToken String?
-  refreshToken String?
-  idToken String?
-  accessTokenExpiresAt DateTime?
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                Int
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
   refreshTokenExpiresAt DateTime?
-  scope String?
-  password String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
   @@map("account")
 }
 
-model BetterAuthVerification {
-  id String @id
+model Verification {
+  id         String    @id
   identifier String
-  value String
-  expiresAt DateTime
-  createdAt DateTime? @default(now())
-  updatedAt DateTime? @updatedAt
-  
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime? @default(now())
+  updatedAt  DateTime? @updatedAt
+
   @@map("verification")
 }
