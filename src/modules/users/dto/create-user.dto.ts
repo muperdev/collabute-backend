@@ -7,7 +7,7 @@ import {
   IsNumber,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { UserType, KycStatus, PaymentMethod } from '@prisma/client';
+import { UserType, KycStatus } from '@prisma/client';
 
 export class CreateUserDto {
   @ApiProperty()
@@ -19,6 +19,16 @@ export class CreateUserDto {
   @IsString()
   name: string;
 
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  password?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  profilePicture?: string;
+
   @ApiPropertyOptional({ enum: UserType })
   @IsOptional()
   @IsEnum(UserType)
@@ -27,47 +37,12 @@ export class CreateUserDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  username?: string;
+  phoneNumber?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  bio?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  profilePicture?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  location?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  website?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  company?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  jobTitle?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  timezone?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  language?: string;
+  countryCode?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -77,25 +52,40 @@ export class CreateUserDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  phoneNumber?: string;
+  industry?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  roleId?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  isVerified?: boolean;
 
   @ApiPropertyOptional({ enum: KycStatus })
   @IsOptional()
   @IsEnum(KycStatus)
   kycStatus?: KycStatus;
 
-  @ApiPropertyOptional({ enum: PaymentMethod })
-  @IsOptional()
-  @IsEnum(PaymentMethod)
-  preferredPayment?: PaymentMethod;
-
   @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()
-  isActive?: boolean;
+  earlybird?: boolean;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsNumber()
-  roleId?: number;
+  wallet?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  emailVerified?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  image?: string;
 }

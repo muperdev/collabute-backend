@@ -21,10 +21,15 @@ export class UsersService {
       roleId = defaultRole?.id;
     }
 
+    // Prepare user data with proper types
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { roleId: _, ...userData } = createUserDto;
+
     return this.prisma.user.create({
       data: {
-        ...createUserDto,
-        roleId,
+        ...userData,
+        emailVerified: userData.emailVerified ?? false,
+        ...(roleId && { roleId }),
       },
       include: {
         role: true,
